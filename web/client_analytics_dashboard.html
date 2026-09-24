@@ -168,7 +168,7 @@
           <div id="lblKpiProlong" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Prolongations</div>
         </div>
         <div id="kpiProlongCount" class="text-3xl font-black text-purple-400">—</div>
-        <div id="lblKpiProlongSub" class="text-xs text-graphite-500 mt-1">Total value prolonged</div>
+        <div id="kpiProlongValue" class="text-xs text-graphite-500 mt-1">Total value prolonged</div>
       </div>
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
@@ -801,7 +801,7 @@ function applyDashboardTranslations() {
   if (el('lblKpiAtRisk')) el('lblKpiAtRisk').textContent = d.kpiAtRisk;
   if (el('lblKpiAtRiskSub')) el('lblKpiAtRiskSub').textContent = d.kpiAtRiskSub;
   if (el('lblKpiProlong')) el('lblKpiProlong').textContent = d.kpiProlongCount;
-  if (el('lblKpiProlongSub')) el('lblKpiProlongSub').textContent = d.kpiProlongSub;
+  if (el('kpiProlongValue')) el('kpiProlongValue').textContent = d.kpiProlongSub;
   if (el('lblKpiInventoryTitle')) el('lblKpiInventoryTitle').textContent = d.kpiInventory;
   if (el('lblOverviewChartTitle')) el('lblOverviewChartTitle').textContent = d.chartOverviewTitle;
   if (el('lblDonutChartTitle')) el('lblDonutChartTitle').textContent = d.chartDonutTitle;
@@ -1014,21 +1014,32 @@ async function renderOverview() {
     if (c.status === 'PROLONGED')         { prolongCount++; prolongValue += c.nominal||0; }
   });
 
-  document.getElementById('kpiLiability').textContent    = formatCurrency(liability/100, currency);
-  document.getElementById('kpiBreakage').textContent     = formatCurrency(breakage/100,  currency);
-  document.getElementById('kpiAtRisk').textContent       = formatCurrency(atRisk/100,    currency);
-  document.getElementById('kpiProlongCount').textContent = prolongCount;
-  document.getElementById('kpiProlongValue').textContent = formatCurrency(prolongValue/100, currency) + ' total value';
-  document.getElementById('kpiInventory').innerHTML = `
-    <span class="text-xs px-2 py-0.5 rounded-full badge-info">${issued} issued</span>
-    <span class="text-xs px-2 py-0.5 rounded-full badge-success">${active} active</span>
-    <span class="text-xs px-2 py-0.5 rounded-full badge-error">${expired} expired</span>
-    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(107,114,128,0.2);color:#6b7280;border:1px solid rgba(107,114,128,0.3)">${depleted} depleted</span>`;
+  const kpiLiab = document.getElementById('kpiLiability');
+  if (kpiLiab) kpiLiab.textContent = formatCurrency(liability/100, currency);
+  const kpiBrk = document.getElementById('kpiBreakage');
+  if (kpiBrk) kpiBrk.textContent = formatCurrency(breakage/100, currency);
+  const kpiRisk = document.getElementById('kpiAtRisk');
+  if (kpiRisk) kpiRisk.textContent = formatCurrency(atRisk/100, currency);
+  const kpiPrCount = document.getElementById('kpiProlongCount');
+  if (kpiPrCount) kpiPrCount.textContent = prolongCount;
+  const kpiPrVal = document.getElementById('kpiProlongValue');
+  if (kpiPrVal) kpiPrVal.textContent = formatCurrency(prolongValue/100, currency) + ' ' + (t('kpiProlongSub') || 'total value');
+  const kpiInv = document.getElementById('kpiInventory');
+  if (kpiInv) {
+    kpiInv.innerHTML = `
+      <span class="text-xs px-2 py-0.5 rounded-full badge-info">${issued} issued</span>
+      <span class="text-xs px-2 py-0.5 rounded-full badge-success">${active} active</span>
+      <span class="text-xs px-2 py-0.5 rounded-full badge-error">${expired} expired</span>
+      <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(107,114,128,0.2);color:#6b7280;border:1px solid rgba(107,114,128,0.3)">${depleted} depleted</span>`;
+  }
 
   // Header stats
-  document.getElementById('dbTxCount').textContent   = transactions.length;
-  document.getElementById('dbCardCount').textContent = cards.length;
-  document.getElementById('dbInfo').classList.remove('hidden');
+  const dbTx = document.getElementById('dbTxCount');
+  if (dbTx) dbTx.textContent = transactions.length;
+  const dbCd = document.getElementById('dbCardCount');
+  if (dbCd) dbCd.textContent = cards.length;
+  const dbInf = document.getElementById('dbInfo');
+  if (dbInf) dbInf.classList.remove('hidden');
 
   // Overview chart — last 30 days
   const last30 = {};
