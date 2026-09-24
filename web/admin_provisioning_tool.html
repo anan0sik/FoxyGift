@@ -1,0 +1,3153 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoxyGift Vendor Provisioning Tool</title>
+  <meta name="description" content="FoxyGift private offline vendor tool for merchant management, master key generation, and card pre-initialization." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script>
+    // Suppress Tailwind Play CDN development notice in console
+    const _origWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      _origWarn.apply(console, args);
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            foxy: {
+              50:  '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              300: '#fcd34d',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+              900: '#78350f',
+            },
+            graphite: {
+              50:  '#f9fafb',
+              100: '#f3f4f6',
+              200: '#e5e7eb',
+              300: '#d1d5db',
+              400: '#9ca3af',
+              500: '#6b7280',
+              600: '#4b5563',
+              700: '#374151',
+              800: '#1f2937',
+              900: '#111827',
+              950: '#030712',
+            }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          animation: {
+            'pulse-ring': 'pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite',
+            'fade-in': 'fadeIn 0.3s ease-in-out',
+            'slide-up': 'slideUp 0.3s ease-out',
+          },
+          keyframes: {
+            'pulse-ring': {
+              '0%':   { transform: 'scale(0.8)', opacity: '1' },
+              '80%,100%': { transform: 'scale(2)', opacity: '0' },
+            },
+            fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
+            slideUp: { from: { opacity: '0', transform: 'translateY(12px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 3px; }
+    .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #9ca3af; }
+    .tab-inactive:hover { color: #fbbf24; border-bottom-color: #92400e; }
+    .nfc-radar { position: relative; display: flex; align-items: center; justify-content: center; }
+    .nfc-radar::before, .nfc-radar::after {
+      content: ''; position: absolute; border-radius: 50%;
+      border: 2px solid #f59e0b; animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    .nfc-radar::after { animation-delay: 1s; }
+    @keyframes pulse-ring {
+      0% { width: 60px; height: 60px; opacity: 1; }
+      100% { width: 140px; height: 140px; opacity: 0; }
+    }
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .glass { background: rgba(31, 41, 55, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.1); }
+    .glow { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-error   { background: rgba(239, 68, 68, 0.15);  color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-warn    { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-info    { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+    tr:hover td { background: rgba(245, 158, 11, 0.04); }
+  </style>
+</head>
+<body class="bg-graphite-950 text-graphite-100 min-h-screen">
+
+<!-- ═══════════════════════════════════════════════════════ TOAST ═══ -->
+<div id="toastContainer" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-80 pointer-events-none"></div>
+
+<!-- ═══════════════════════════════════════════════════════ MODAL ═══ -->
+<div id="modalOverlay" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-fade-in">
+  <div id="modalBox" class="bg-graphite-900 border border-graphite-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-slide-up">
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ NFC OVERLAY ═══ -->
+<div id="nfcOverlay" class="hidden fixed inset-0 z-[60] bg-graphite-950/95 flex flex-col items-center justify-center gap-8">
+  <div class="nfc-radar w-20 h-20 flex items-center justify-center">
+    <div class="w-16 h-16 rounded-full bg-foxy-600/20 flex items-center justify-center">
+      <svg class="w-8 h-8 text-foxy-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/>
+      </svg>
+    </div>
+  </div>
+  <div class="text-center">
+    <div class="text-3xl font-black text-foxy-400 mb-2 tracking-tight">👉 Hold card steady until the beep!</div>
+    <div class="text-xl font-bold text-foxy-300">«Держите карту неподвижно до звукового сигнала!»</div>
+    <div id="nfcStatusText" class="mt-4 text-graphite-400 text-sm">Scanning for NFC card...</div>
+  </div>
+  <button id="nfcCancelBtn" onclick="cancelNfc()" class="px-6 py-3 rounded-xl border border-graphite-700 text-graphite-300 hover:border-foxy-600 hover:text-foxy-400 transition-all">
+    Cancel
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ HEADER ═══ -->
+<header class="sticky top-0 z-40 bg-graphite-900/90 backdrop-blur-md border-b border-graphite-800 shadow-lg">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-foxy-400 to-foxy-700 flex items-center justify-center shadow-lg glow">
+        <span class="text-lg font-black text-white">🦊</span>
+      </div>
+      <div>
+        <div class="font-black text-white text-lg leading-tight tracking-tight">FoxyGift</div>
+        <div class="text-xs text-foxy-500 font-semibold uppercase tracking-widest">Vendor Provisioning Tool</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="dbStatusBadge" class="px-3 py-1 rounded-full text-xs font-semibold badge-warn">DB Initializing…</span>
+      <button onclick="exportBackup()" title="Export Backup" class="p-2 rounded-lg hover:bg-graphite-800 text-graphite-400 hover:text-foxy-400 transition-all">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      </button>
+      <button onclick="importBackup()" title="Import Backup" class="p-2 rounded-lg hover:bg-graphite-800 text-graphite-400 hover:text-foxy-400 transition-all">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════ TABS ═══ -->
+<nav class="bg-graphite-900 border-b border-graphite-800 sticky top-16 z-30">
+  <div class="max-w-7xl mx-auto px-4 flex gap-0 overflow-x-auto no-scrollbar">
+    <button onclick="showTab('dashboard')"  id="tab-dashboard"  class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-active">📊 Dashboard</button>
+    <button onclick="showTab('merchants')"  id="tab-merchants"  class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-inactive">🏪 Merchants</button>
+    <button onclick="showTab('keys')"       id="tab-keys"       class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-inactive">🔑 Key Management</button>
+    <button onclick="showTab('provisioning')" id="tab-provisioning" class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-inactive">📱 Provisioning QR</button>
+    <button onclick="showTab('preinit')"    id="tab-preinit"    class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-inactive">💳 Card Pre-Init (ACR1581U)</button>
+    <button onclick="showTab('audit')"      id="tab-audit"      class="tab-btn whitespace-nowrap px-5 py-4 text-sm font-semibold transition-all tab-inactive">📋 Audit Log</button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN ═══ -->
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- ─────────────────────────── TAB: DASHBOARD ─────────────────── -->
+  <section id="pane-dashboard" class="tab-pane space-y-6 animate-fade-in">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="glass rounded-2xl p-5">
+        <div class="text-graphite-400 text-xs font-semibold uppercase tracking-wider mb-1">Merchants</div>
+        <div id="statMerchants" class="text-4xl font-black text-white">—</div>
+        <div class="text-graphite-500 text-xs mt-1">Active profiles</div>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <div class="text-graphite-400 text-xs font-semibold uppercase tracking-wider mb-1">Master Keys</div>
+        <div id="statKeys" class="text-4xl font-black text-foxy-400">—</div>
+        <div class="text-graphite-500 text-xs mt-1">Provisioned networks</div>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <div class="text-graphite-400 text-xs font-semibold uppercase tracking-wider mb-1">Pre-Init Cards</div>
+        <div id="statCards" class="text-4xl font-black text-emerald-400">—</div>
+        <div class="text-graphite-500 text-xs mt-1">Locked &amp; ready</div>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <div class="text-graphite-400 text-xs font-semibold uppercase tracking-wider mb-1">Audit Events</div>
+        <div id="statAudit" class="text-4xl font-black text-blue-400">—</div>
+        <div class="text-graphite-500 text-xs mt-1">Recorded actions</div>
+      </div>
+    </div>
+    <!-- Recent audit -->
+    <div class="glass rounded-2xl p-5">
+      <div class="font-bold text-white mb-4">Recent Activity</div>
+      <div id="recentAudit" class="space-y-2 text-sm text-graphite-400">Loading…</div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── TAB: MERCHANTS ─────────────────── -->
+  <section id="pane-merchants" class="tab-pane hidden space-y-4 animate-fade-in">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-white">Merchant Registry</h2>
+      <button onclick="openMerchantForm(null)" class="flex items-center gap-2 px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-semibold text-sm transition-all">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Add Merchant
+      </button>
+    </div>
+    <div class="glass rounded-2xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-graphite-800">
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Network Name</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Location</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Terminal ID</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Currency</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Validity</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Language</th>
+              <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Status</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="merchantTableBody">
+            <tr><td colspan="8" class="px-4 py-8 text-center text-graphite-500">No merchants registered yet. Add your first merchant.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── TAB: KEYS ─────────────────── -->
+  <section id="pane-keys" class="tab-pane hidden space-y-4 animate-fade-in">
+    <h2 class="text-xl font-bold text-white">Key Management</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Master Key Generator -->
+      <div class="glass rounded-2xl p-5 space-y-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-foxy-900/50 flex items-center justify-center"><span class="text-lg">🔐</span></div>
+          <div class="font-bold text-white">Network Master Secret</div>
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Merchant</label>
+          <select id="keyMerchantSel" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="">— Select Merchant —</option>
+          </select>
+        </div>
+        <div id="existingKeyDisplay" class="hidden space-y-2">
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Current Master Secret (hex)</label>
+          <div id="masterKeyHex" class="font-mono text-xs bg-graphite-950 rounded-xl p-3 text-foxy-300 break-all border border-graphite-700 select-all"></div>
+          <div id="masterKeyId" class="text-xs text-graphite-500"></div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="generateMasterKey()" class="flex-1 py-2 bg-foxy-700 hover:bg-foxy-600 text-white rounded-xl font-semibold text-sm transition-all">⚡ Generate New Key</button>
+          <button onclick="copyMasterKey()" class="px-3 py-2 border border-graphite-700 hover:border-foxy-600 text-graphite-400 hover:text-foxy-400 rounded-xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          </button>
+        </div>
+        <p class="text-xs text-graphite-500">⚠️ Generating a new key invalidates all existing cards for this merchant. Back up the old key before replacing.</p>
+      </div>
+
+      <!-- PIN Configuration -->
+      <div class="glass rounded-2xl p-5 space-y-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-foxy-900/50 flex items-center justify-center"><span class="text-lg">🔢</span></div>
+          <div class="font-bold text-white">PIN Hierarchy Configuration</div>
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Merchant</label>
+          <select id="pinMerchantSel" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="">— Select Merchant —</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 gap-3">
+          <div>
+            <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Admin PIN (4–6 digits)</label>
+            <div class="flex gap-2 mt-1">
+              <input id="adminPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" class="flex-1 bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm font-mono tracking-widest focus:border-foxy-500 focus:outline-none" />
+              <button onclick="toggleVisibility('adminPinInput')" class="px-3 border border-graphite-700 rounded-xl text-graphite-400 hover:text-foxy-400 transition-all">👁</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Cashier PIN (4–6 digits)</label>
+            <div class="flex gap-2 mt-1">
+              <input id="cashierPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" class="flex-1 bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm font-mono tracking-widest focus:border-foxy-500 focus:outline-none" />
+              <button onclick="toggleVisibility('cashierPinInput')" class="px-3 border border-graphite-700 rounded-xl text-graphite-400 hover:text-foxy-400 transition-all">👁</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Prolongation PIN (4–6 digits)</label>
+            <div class="flex gap-2 mt-1">
+              <input id="prolongPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" class="flex-1 bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm font-mono tracking-widest focus:border-foxy-500 focus:outline-none" />
+              <button onclick="toggleVisibility('prolongPinInput')" class="px-3 border border-graphite-700 rounded-xl text-graphite-400 hover:text-foxy-400 transition-all">👁</button>
+            </div>
+            <p class="text-xs text-graphite-500 mt-1">Required to extend expired card validity.</p>
+          </div>
+        </div>
+        <button onclick="savePins()" class="w-full py-2 bg-foxy-700 hover:bg-foxy-600 text-white rounded-xl font-semibold text-sm transition-all">💾 Save PIN Configuration</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── TAB: PROVISIONING QR ─────────────────── -->
+  <section id="pane-provisioning" class="tab-pane hidden space-y-4 animate-fade-in">
+    <h2 class="text-xl font-bold text-white">Terminal Provisioning QR Generator</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="glass rounded-2xl p-5 space-y-4">
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Select Merchant</label>
+          <select id="qrMerchantSel" onchange="onQrMerchantChange()" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="">— Select Merchant —</option>
+          </select>
+        </div>
+        <div id="qrMerchantInfo" class="hidden p-3 bg-graphite-800/50 rounded-xl text-xs space-y-1 text-graphite-300">
+        </div>
+        <div class="border border-graphite-700 rounded-xl p-3 space-y-2">
+          <div class="font-semibold text-sm text-white">Payload Preview</div>
+          <div class="text-xs text-graphite-400 space-y-1">
+            <div>✅ Merchant ID + Network Hash</div>
+            <div>✅ Master Secret (AES-256-GCM encrypted)</div>
+            <div>✅ Admin / Cashier / Prolongation PINs (hashed)</div>
+            <div>✅ Default validity &amp; prolongation periods</div>
+            <div>✅ Currency, language, Telegram config</div>
+            <div>✅ HMAC-SHA256 integrity signature</div>
+          </div>
+        </div>
+        <button onclick="generateProvisioningQR()" id="generateQrBtn" disabled class="w-full py-3 bg-foxy-600 hover:bg-foxy-500 disabled:bg-graphite-700 disabled:text-graphite-500 text-white rounded-xl font-bold transition-all">
+          ⚡ Generate Encrypted QR Code
+        </button>
+        <button onclick="printProvisioningSheet()" id="printQrBtn" disabled class="w-full py-2 border border-foxy-700 hover:border-foxy-500 text-foxy-400 hover:text-foxy-300 disabled:border-graphite-700 disabled:text-graphite-600 rounded-xl font-semibold text-sm transition-all">
+          🖨 Print Provisioning Sheet
+        </button>
+      </div>
+      <div class="glass rounded-2xl p-6 flex flex-col items-center justify-center gap-4 min-h-[360px]">
+        <div id="qrCodeWrapper" class="p-3 bg-white rounded-2xl shadow-xl flex items-center justify-center">
+          <div id="qrCodeDisplay" class="w-[300px] h-[300px] flex items-center justify-center text-graphite-400 text-sm">
+            <div class="text-center p-4">
+              <div class="text-4xl mb-2">📱</div>
+              <div>Select a merchant and generate</div>
+            </div>
+          </div>
+        </div>
+        <div id="qrCodeCaption" class="text-center text-xs text-graphite-500 hidden space-y-1">
+          <div id="qrCodeMerchantName" class="font-bold text-white text-base"></div>
+          <div id="qrCodeTimestamp" class="text-graphite-400"></div>
+          <div class="flex items-center justify-center gap-2 pt-1">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold badge-success inline-block">AES-256-GCM Encrypted</span>
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-graphite-800 text-graphite-300 border border-graphite-700 inline-block">Compact Base64</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── TAB: CARD PRE-INIT ─────────────────── -->
+  <section id="pane-preinit" class="tab-pane hidden space-y-4 animate-fade-in">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div>
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <span>💳</span> Card Pre-Initialization &amp; Vendor Lock-in
+        </h2>
+        <p class="text-xs text-graphite-400 mt-0.5">Program blank NTAG chips with merchant master secrets, digital signatures, and hardware password lock.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="testAcrChime()" title="Test Audio Chimes" class="px-3 py-1.5 text-xs bg-graphite-800 hover:bg-graphite-700 text-graphite-300 hover:text-white rounded-xl border border-graphite-700 transition-all flex items-center gap-1.5">
+          <span>🔊</span> Test Chime
+        </button>
+        <button onclick="openBridgeGuide()" title="Bridge Connection Guide" class="px-3 py-1.5 text-xs bg-graphite-800 hover:bg-graphite-700 text-foxy-400 hover:text-foxy-300 rounded-xl border border-graphite-700 transition-all flex items-center gap-1.5">
+          <span>🔌</span> Bridge Guide
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert / Explainer -->
+    <div class="glass rounded-2xl p-4 border-l-4 border-foxy-500">
+      <div class="font-semibold text-foxy-300 text-sm flex items-center justify-between">
+        <span>🔒 Hardware Vendor Lock-in (ACR1581U / PC-SC)</span>
+        <span class="text-xs font-normal text-graphite-400">Locking: PWD/PACK + AUTH0=04 + PROT=1</span>
+      </div>
+      <div class="text-xs text-graphite-400 mt-1">
+        This step prepares blank NTAG213/215/216 chips prior to delivery. It programs the <strong class="text-white">FOXY</strong> magic bytes, merchant network hash, digital HMAC signature, and activates hardware password protection. Un-provisioned or foreign cards will be rejected by merchant POS terminals.
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- ─── PRIMARY METHOD: ACS ACR1581U USB READER (Desktop) ─── -->
+      <div class="lg:col-span-7 space-y-4">
+        <div class="glass rounded-2xl p-5 space-y-4 border border-graphite-800">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg">
+                <span class="text-xl">🦊</span>
+              </div>
+              <div>
+                <div class="font-bold text-white text-sm flex items-center gap-1.5">
+                  ACS ACR1581U USB Reader
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-foxy-950 text-foxy-400 border border-foxy-800 font-mono">PC/SC</span>
+                </div>
+                <div class="text-xs text-graphite-400" id="acrReaderSubtext">Checking local PC/SC bridge...</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="acrBridgeBadge" class="px-2.5 py-1 text-xs font-semibold rounded-full badge-warn flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Connecting…
+              </span>
+              <button onclick="checkAcrBridge(true)" title="Refresh Reader" class="p-1.5 text-graphite-400 hover:text-white hover:bg-graphite-800 rounded-lg transition-all">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Reader selection (if multiple) -->
+          <div id="acrReaderSelectWrap" class="hidden">
+            <label class="text-[11px] text-graphite-400 font-semibold uppercase tracking-wider">Active Reader Interface (PICC / ICC)</label>
+            <select id="acrReaderSelect" onchange="pollAcrCard()" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-1.5 text-white text-xs focus:border-foxy-500 focus:outline-none font-sans">
+            </select>
+          </div>
+
+          <!-- Live Card Radar Box -->
+          <div id="acrRadarBox" class="relative overflow-hidden rounded-2xl bg-graphite-950 border border-graphite-800 p-6 flex flex-col items-center justify-center min-h-[190px] transition-all">
+            <!-- Idle Radar Animation -->
+            <div id="acrRadarIdle" class="flex flex-col items-center justify-center text-center gap-3">
+              <div class="nfc-radar w-16 h-16 flex items-center justify-center">
+                <div class="w-12 h-12 rounded-full bg-foxy-600/20 flex items-center justify-center text-xl">
+                  💳
+                </div>
+              </div>
+              <div>
+                <div class="text-sm font-bold text-graphite-200">Waiting for Card…</div>
+                <div class="text-xs text-graphite-500 mt-0.5">Place NTAG213/215/216 on the ACR1581U contactless surface</div>
+              </div>
+            </div>
+
+            <!-- Card Detected State -->
+            <div id="acrRadarCardPresent" class="hidden w-full space-y-3 animate-fade-in">
+              <div class="flex items-center justify-between pb-2 border-b border-graphite-800">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Card Detected</span>
+                </div>
+                <span id="acrCardChipTypeBadge" class="px-2 py-0.5 text-xs font-mono font-semibold rounded badge-info">NTAG213</span>
+              </div>
+
+              <div class="text-center py-1">
+                <div class="text-[11px] text-graphite-500 uppercase tracking-widest font-semibold">Decimal Card Number</div>
+                <div id="acrCardNumberDisplay" class="text-2xl font-black text-foxy-400 font-mono tracking-wider select-all mt-0.5">0000 0000 0000 0000</div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs bg-graphite-900/60 p-2.5 rounded-xl border border-graphite-800/80">
+                <div>
+                  <span class="text-graphite-500">Factory UID:</span>
+                  <span id="acrCardUidDisplay" class="font-mono text-graphite-300 ml-1">04:00:00:00:00:00:00</span>
+                </div>
+                <div>
+                  <span class="text-graphite-500">CC Header:</span>
+                  <span id="acrCardCcDisplay" class="font-mono text-graphite-300 ml-1">—</span>
+                </div>
+                <div>
+                  <span class="text-graphite-500">Magic Marker:</span>
+                  <span id="acrCardMagicDisplay" class="font-mono text-graphite-300 ml-1">—</span>
+                </div>
+                <div>
+                  <span class="text-graphite-500">Foxy Status:</span>
+                  <span id="acrCardFoxyStatusDisplay" class="ml-1 text-graphite-300 font-semibold">—</span>
+                </div>
+              </div>
+
+              <!-- Conveyor status feedback in card view -->
+              <div id="acrConveyorPrompt" class="hidden text-center py-1 text-xs font-bold text-amber-300 animate-pulse">
+                ⚡ Initializing card, hold steady…
+              </div>
+            </div>
+          </div>
+
+          <!-- Configuration Fields -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Target Merchant</label>
+              <select id="preinitMerchantSel" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+                <option value="">— Select Merchant —</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Chip Model</label>
+              <select id="chipTypeSel" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+                <option value="AUTO" selected>✨ Auto-Detect (from CC)</option>
+                <option value="NTAG213">NTAG213 (144 bytes / 36 p.)</option>
+                <option value="NTAG215">NTAG215 (504 bytes / 126 p.)</option>
+                <option value="NTAG216">NTAG216 (888 bytes / 222 p.)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Action Controls & Conveyor Settings -->
+          <div class="space-y-3 pt-2">
+            <!-- Mode Switch: Auto-Conveyor vs Manual -->
+            <div class="flex items-center justify-between p-3.5 rounded-xl bg-graphite-900/90 border border-graphite-700/80 shadow-md">
+              <div class="flex items-center gap-3">
+                <span class="text-2xl">⚡</span>
+                <div>
+                  <div class="text-sm font-bold text-white flex items-center gap-2">
+                    Авто-прошивка при поднесении
+                    <span id="acrAutoBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">АКТИВНА</span>
+                  </div>
+                  <div class="text-xs text-graphite-400">Автоматически прошивать чип сразу при касании ридера</div>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer select-none">
+                <input type="checkbox" id="acrAutoInitCheckbox" checked onchange="setAcrBatchMode(this.checked)" class="sr-only peer">
+                <div class="w-12 h-6 bg-graphite-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+
+            <!-- Manual Trigger & Inspect Controls -->
+            <div class="flex flex-col sm:flex-row gap-2">
+              <button type="button" onclick="manualPreinitCurrentCard()" id="acrManualPreinitBtn" disabled class="flex-1 py-3 px-5 bg-foxy-600 hover:bg-foxy-500 disabled:bg-graphite-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm border border-foxy-500/30 disabled:border-graphite-700 transition-all flex items-center justify-center gap-2 shadow-lg">
+                <span>🎯</span>
+                <span id="acrManualBtnText">Прошить карту (Init Card)</span>
+              </button>
+
+              <button type="button" onclick="inspectAcrCard()" id="acrInspectBtn" disabled class="py-3 px-3 bg-graphite-800 hover:bg-graphite-700 text-graphite-300 hover:text-white rounded-xl text-xs font-semibold border border-graphite-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40" title="Чтение памяти чипа (страницы 00..16)">
+                <span>🔍</span> Память (00..16)
+              </button>
+
+              <button type="button" onclick="testNtag213Page4()" id="acrTestNtagBtn" disabled class="py-3 px-3 bg-graphite-800 hover:bg-graphite-700 text-foxy-400 hover:text-white rounded-xl text-xs font-semibold border border-graphite-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40" title="Тест записи и чтения 4 байт (TEST) на страницу 4">
+                <span>🧪</span> Тест NTAG213
+              </button>
+
+              <button type="button" onclick="openNdefUrlModal()" id="acrNdefBtn" disabled class="py-3 px-3 bg-graphite-800 hover:bg-graphite-700 text-blue-400 hover:text-white rounded-xl text-xs font-semibold border border-graphite-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40" title="Записать NDEF ссылку (URL) на чип NTAG213">
+                <span>🔗</span> NDEF URL
+              </button>
+            </div>
+
+            <!-- Conveyor banner message when active -->
+            <div id="acrConveyorBanner" class="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2.5">
+              <span class="text-lg">✨</span>
+              <div>
+                <strong>Авто-прошивка активна:</strong> Прикладывайте чистые карты к ридеру ACR1581U по одной. Карта автоматически инициализируется, проверяется и блокируется паролем за ~200мс.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Method: Web NFC (Mobile Android / Simulator) Collapsible -->
+        <details id="webNfcDetails" class="glass rounded-2xl p-4 border border-graphite-800 text-xs text-graphite-400 group">
+          <summary class="font-bold text-graphite-300 cursor-pointer list-none flex items-center justify-between select-none">
+            <span class="flex items-center gap-2">
+              <span>📱</span> Method B: Web NFC (Chrome на Android / Симулятор)
+            </span>
+            <span id="nfcSupportBadge" class="px-2 py-0.5 text-xs font-semibold rounded-full badge-warn">Проверка…</span>
+          </summary>
+          <div class="mt-4 pt-3 border-t border-graphite-800 space-y-3">
+            <p id="webNfcStatusDesc">Web NFC позволяет сканировать и прошивать карты напрямую через встроенный NFC-чип в браузере Chrome на Android или через встроенный симулятор для тестирования на ПК.</p>
+            
+            <div id="webNfcSimPanel" class="hidden p-3 bg-graphite-900/80 rounded-xl border border-graphite-700 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 🧪 Режим симулятора Web NFC
+                </span>
+                <button type="button" onclick="disableWebNfcSimulator()" class="text-[11px] text-graphite-400 hover:text-white underline">Отключить</button>
+              </div>
+              <div class="flex gap-2">
+                <input type="text" id="webNfcSimUid" placeholder="04:A2:3B:01:23:45:67" class="flex-1 px-3 py-1.5 bg-graphite-800 border border-graphite-700 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-blue-500" />
+                <button type="button" onclick="generateRandomSimUid()" class="px-2.5 py-1.5 bg-graphite-700 hover:bg-graphite-600 text-white rounded-lg text-xs" title="Сгенерировать случайный UID">🎲</button>
+              </div>
+              <button type="button" onclick="simulateWebNfcScan()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-all shadow-lg shadow-emerald-900/30">
+                💳 Симулировать поднесение карты к Web NFC
+              </button>
+            </div>
+
+            <button type="button" onclick="toggleWebNfcPreInit()" id="nfcPreInitBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20">
+              <span id="nfcBtnIcon">📡</span> <span id="nfcBtnText">Активировать Web NFC</span>
+            </button>
+          </div>
+        </details>
+      </div>
+
+      <!-- ─── RIGHT COLUMN: BATCH SESSION LOG & STATS ─── -->
+      <div class="lg:col-span-5 space-y-4">
+        <!-- Live session metrics -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass rounded-2xl p-4">
+            <div class="text-[11px] text-graphite-400 font-semibold uppercase tracking-wider">Session Initialized</div>
+            <div id="preinitCountBadge" class="text-3xl font-black text-emerald-400 mt-1">0</div>
+            <div class="text-[11px] text-graphite-500 mt-0.5">Cards locked in</div>
+          </div>
+          <div class="glass rounded-2xl p-4">
+            <div class="text-[11px] text-graphite-400 font-semibold uppercase tracking-wider">Hardware Lock</div>
+            <div class="text-xs font-bold text-foxy-400 mt-2 flex items-center gap-1">
+              <span>🔒</span> PWD+PACK / PROT
+            </div>
+            <div class="text-[11px] text-graphite-500 mt-0.5">Auth starts at Page 04</div>
+          </div>
+        </div>
+
+        <!-- Session Log -->
+        <div class="glass rounded-2xl p-5 space-y-3 border border-graphite-800">
+          <div class="flex items-center justify-between">
+            <div class="font-bold text-white text-sm flex items-center gap-2">
+              <span>📋</span> Pre-Init Session Log
+            </div>
+            <button onclick="clearPreinitLog()" class="px-2.5 py-1 hover:bg-graphite-800 text-graphite-400 hover:text-red-400 rounded-lg text-xs font-semibold transition-all">
+              Clear
+            </button>
+          </div>
+          <div id="preinitLog" class="space-y-2 max-h-[360px] overflow-y-auto text-xs font-mono pr-1">
+            <div class="text-graphite-500 py-6 text-center">Session log will appear here as cards are processed…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── BOTTOM SECTION: PRE-INITIALIZED CARDS REGISTRY TABLE ─── -->
+    <div class="glass rounded-2xl p-5 border border-graphite-800">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <div class="font-bold text-white text-base">Pre-Initialized Card Registry</div>
+          <div class="text-xs text-graphite-400">All genuine cards prepared and signed by this provisioning tool</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="exportPreInitCards()" class="px-3.5 py-2 text-xs bg-graphite-800 hover:bg-graphite-700 border border-graphite-700 hover:border-foxy-600 text-graphite-300 hover:text-foxy-400 rounded-xl font-semibold transition-all flex items-center gap-1.5">
+            <span>📥</span> Export CSV
+          </button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-graphite-800">
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Card № (Decimal)</th>
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Chip Model</th>
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Target Merchant</th>
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Pre-Init Date</th>
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Security Status</th>
+              <th class="text-left px-3 py-2.5 text-graphite-400 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="preinitCardTable">
+            <tr><td colspan="6" class="px-3 py-6 text-center text-graphite-500">No pre-initialized cards yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── TAB: AUDIT LOG ─────────────────── -->
+  <section id="pane-audit" class="tab-pane hidden space-y-4 animate-fade-in">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-white">Audit Log</h2>
+      <div class="flex gap-2">
+        <input id="auditSearch" oninput="filterAuditLog()" type="text" placeholder="Search…" class="bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none w-48" />
+        <button onclick="exportAuditLog()" class="px-4 py-2 text-sm border border-graphite-700 hover:border-foxy-600 text-graphite-400 hover:text-foxy-400 rounded-xl transition-all">Export</button>
+      </div>
+    </div>
+    <div class="glass rounded-2xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-graphite-800">
+            <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Timestamp</th>
+            <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Action</th>
+            <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Merchant</th>
+            <th class="text-left px-4 py-3 text-graphite-400 font-semibold">Details</th>
+          </tr>
+        </thead>
+        <tbody id="auditLogTable">
+          <tr><td colspan="4" class="px-4 py-8 text-center text-graphite-500">No audit events recorded.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════ MERCHANT FORM MODAL ═══ -->
+<div id="merchantFormModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 pt-8 overflow-y-auto">
+  <div class="bg-graphite-900 border border-graphite-700 rounded-2xl w-full max-w-2xl shadow-2xl mb-8">
+    <div class="flex items-center justify-between p-6 border-b border-graphite-800">
+      <h3 id="merchantFormTitle" class="font-bold text-white text-lg">New Merchant Profile</h3>
+      <button onclick="closeMerchantForm()" class="p-2 rounded-lg hover:bg-graphite-800 text-graphite-400 hover:text-white transition-all">✕</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="mf_id" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Network Name *</label>
+          <input id="mf_networkName" type="text" placeholder="e.g. CoffeeChain" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Location/Store Name *</label>
+          <input id="mf_locationName" type="text" placeholder="e.g. Riga Central" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Terminal ID *</label>
+          <input id="mf_terminalId" type="text" placeholder="e.g. T001" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Reporting Email</label>
+          <input id="mf_email" type="email" placeholder="owner@store.com" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Telegram Bot Token</label>
+          <input id="mf_tgToken" type="text" placeholder="123456:ABC-DEF..." class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm font-mono focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Telegram Chat ID</label>
+          <input id="mf_tgChatId" type="text" placeholder="-100123456789" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm font-mono focus:border-foxy-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Currency</label>
+          <select id="mf_currency" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="EUR">EUR — Euro</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="LVL">LVL — Latvian Lats (legacy)</option>
+            <option value="PLN">PLN — Polish Zloty</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Default UI Language</label>
+          <select id="mf_language" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="en">EN — English</option>
+            <option value="ru">RU — Russian</option>
+            <option value="lv">LV — Latvian</option>
+            <option value="lt">LT — Lithuanian</option>
+            <option value="et">ET — Estonian</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Card Validity (months)</label>
+          <select id="mf_validity" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="3">3 months</option>
+            <option value="6" selected>6 months</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Prolongation Extension (months)</label>
+          <select id="mf_prolongation" class="mt-1 w-full bg-graphite-800 border border-graphite-700 rounded-xl px-3 py-2 text-white text-sm focus:border-foxy-500 focus:outline-none">
+            <option value="1">1 month</option>
+            <option value="3" selected>3 months</option>
+            <option value="6">6 months</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 px-6 pb-6">
+      <button onclick="closeMerchantForm()" class="px-5 py-2 border border-graphite-700 text-graphite-400 hover:text-white rounded-xl font-semibold text-sm transition-all">Cancel</button>
+      <button onclick="saveMerchant()" class="px-5 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm transition-all">💾 Save Merchant</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ RE-INIT MODAL ═══ -->
+<div id="reinitModal" class="hidden fixed inset-0 z-50 bg-black/75 items-center justify-center p-4 backdrop-blur-sm">
+  <div class="bg-graphite-900 border border-amber-700/50 rounded-2xl w-full max-w-md shadow-2xl shadow-amber-900/20">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-graphite-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-900/40 border border-amber-700/50 flex items-center justify-center text-xl">♻️</div>
+        <div>
+          <h3 class="font-bold text-white text-base">Re-Initialize Card</h3>
+          <p id="reinitModalSubtitle" class="text-xs text-graphite-400">Сброс и перезапись PRE_INIT состояния</p>
+        </div>
+      </div>
+      <button onclick="closeReinitModal()" class="p-2 rounded-lg hover:bg-graphite-800 text-graphite-400 hover:text-white transition-all">✕</button>
+    </div>
+
+    <!-- ── STEP 1: Read card ── -->
+    <div id="reinitStep1" class="px-6 py-5 space-y-4">
+      <!-- Card info row -->
+      <div class="bg-graphite-800/60 rounded-xl px-4 py-3">
+        <div class="text-[11px] text-graphite-400 uppercase tracking-wider font-semibold mb-1">Карта из реестра</div>
+        <div id="reinitCardInfo" class="font-mono text-foxy-400 font-bold text-sm">—</div>
+      </div>
+      <!-- Merchant select -->
+      <div>
+        <label class="text-xs text-graphite-400 font-semibold uppercase tracking-wider">Целевой торговец (для ключа PWD)</label>
+        <select id="reinitMerchantSel" class="mt-1 w-full bg-graphite-800 border border-graphite-700 hover:border-amber-600 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none transition-colors">
+          <option value="">— выбрать торговца —</option>
+        </select>
+        <p class="mt-1.5 text-[11px] text-graphite-500">Используется для аутентификации на карте и перезаписи.</p>
+      </div>
+      <!-- Instruction -->
+      <div class="flex gap-2.5 p-3 rounded-xl bg-graphite-800/50 border border-graphite-700/50 text-xs text-graphite-400">
+        <span class="shrink-0 text-base">📡</span>
+        <span>Приложите карту к ридеру и нажмите <strong class="text-graphite-300">«Считать карту»</strong>, чтобы увидеть текущий баланс перед перезаписью.</span>
+      </div>
+      <!-- Step1 footer -->
+      <div class="flex justify-end gap-3 pt-1">
+        <button onclick="closeReinitModal()" class="px-4 py-2.5 border border-graphite-700 text-graphite-400 hover:text-white rounded-xl font-semibold text-sm transition-all">Отмена</button>
+        <button id="reinitReadBtn" onclick="reinitReadCard()" class="px-5 py-2.5 bg-graphite-700 hover:bg-graphite-600 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          📡 Считать карту
+        </button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Show balance, confirm ── -->
+    <div id="reinitStep2" class="hidden px-6 py-5 space-y-4">
+      <!-- Balance block -->
+      <div id="reinitBalanceBlock" class="rounded-xl border p-4 space-y-3">
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div class="text-[10px] text-graphite-400 uppercase tracking-wider mb-1">Статус</div>
+            <div id="reinitStatusBadge" class="text-sm font-bold">—</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-graphite-400 uppercase tracking-wider mb-1">Номинал</div>
+            <div id="reinitNominalVal" class="text-sm font-bold text-graphite-200">—</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-graphite-400 uppercase tracking-wider mb-1">Остаток</div>
+            <div id="reinitBalanceVal" class="text-lg font-black">—</div>
+          </div>
+        </div>
+        <div id="reinitExpiryRow" class="text-center text-[11px] text-graphite-400"></div>
+      </div>
+      <!-- Warning (shown if balance > 0) -->
+      <div id="reinitBalanceWarn" class="hidden flex gap-3 p-3 rounded-xl bg-red-900/25 border border-red-700/50">
+        <span class="text-lg shrink-0">💸</span>
+        <div class="text-xs text-red-200/90 leading-relaxed">
+          <strong class="text-red-300">На карте остаток!</strong> При переинициализации баланс <strong>безвозвратно уничтожается</strong>. Убедитесь, что клиент использовал или возместил остаток.
+        </div>
+      </div>
+      <!-- Generic overwrite warning -->
+      <div class="flex gap-3 p-3 rounded-xl bg-amber-900/20 border border-amber-700/40">
+        <span class="text-lg shrink-0">⚠️</span>
+        <div class="text-xs text-amber-200/80 leading-relaxed">
+          Переинициализация <strong class="text-amber-300">перезапишет чип</strong> новым PRE_INIT. Карта потеряет все текущие данные.
+        </div>
+      </div>
+      <!-- Confirm input if balance > 0 -->
+      <div id="reinitConfirmAmtRow" class="hidden space-y-1">
+        <label class="text-xs text-red-300 font-semibold uppercase tracking-wider">Введите сумму остатка для подтверждения</label>
+        <input id="reinitConfirmAmtInput" type="text" placeholder="например: 12.50"
+          class="w-full bg-graphite-800 border border-red-700/60 focus:border-red-500 rounded-xl px-3 py-2.5 text-white font-mono text-sm focus:outline-none" />
+        <p class="text-[11px] text-graphite-500">Введите точную сумму остатка для подтверждения намерения.</p>
+      </div>
+      <!-- Step2 footer -->
+      <div class="flex justify-end gap-3 pt-1">
+        <button onclick="reinitGoBack()" class="px-4 py-2.5 border border-graphite-700 text-graphite-400 hover:text-white rounded-xl font-semibold text-sm transition-all">← Назад</button>
+        <button id="reinitConfirmBtn" onclick="confirmReinit()" class="px-5 py-2.5 bg-red-800 hover:bg-red-700 active:bg-red-900 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          ♻️ Перезаписать карту
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PRINT SHEET ═══ -->
+<div id="printSheet" class="hidden">
+  <style>
+    @media print {
+      body > *:not(#printSheet) { display: none !important; }
+      #printSheet { display: block !important; }
+      @page { margin: 15mm; }
+    }
+  </style>
+  <div class="print-sheet-content" style="font-family: monospace; max-width: 700px; margin: 0 auto; padding: 20px; border: 2px solid #000;">
+    <div style="text-align:center; margin-bottom: 20px;">
+      <div style="font-size: 24px; font-weight: 900;">🦊 FoxyGift</div>
+      <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #666;">Terminal Provisioning Certificate</div>
+      <hr style="margin: 10px 0;" />
+    </div>
+    <table id="printSheetData" style="width:100%; font-size:11px; border-collapse: collapse;"></table>
+    <div style="text-align:center; margin-top: 20px;">
+      <div id="printQrContainer"></div>
+      <div style="font-size:10px; color:#666; margin-top:8px;">Scan with FoxyGift POS Terminal Camera to activate</div>
+    </div>
+    <div style="margin-top: 20px; font-size: 9px; color: #999; text-align:center;">
+      CONFIDENTIAL — Keep this sheet secure. Do not share with unauthorized personnel.
+      Generated: <span id="printTimestamp"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCRIPTS ═══ -->
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════ DATABASE ════════════════
+const DB_NAME    = 'FoxyGiftVendorDB';
+const DB_VERSION = 1;
+let db = null;
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('merchants')) {
+        const ms = d.createObjectStore('merchants', { keyPath: 'id', autoIncrement: true });
+        ms.createIndex('networkName', 'networkName', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('masterKeys')) {
+        const ks = d.createObjectStore('masterKeys', { keyPath: 'id', autoIncrement: true });
+        ks.createIndex('merchantId', 'merchantId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('provisionedCards')) {
+        const cs = d.createObjectStore('provisionedCards', { keyPath: 'id', autoIncrement: true });
+        cs.createIndex('cardNumberDec', 'cardNumberDec', { unique: true });
+        cs.createIndex('merchantId', 'merchantId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('auditLog')) {
+        d.createObjectStore('auditLog', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('pinConfig')) {
+        d.createObjectStore('pinConfig', { keyPath: 'merchantId' });
+      }
+    };
+    req.onsuccess = (e) => { resolve(e.target.result); };
+    req.onerror   = (e) => { reject(e.target.error); };
+  });
+}
+
+function dbTx(storeName, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(storeName, mode);
+    const store = tx.objectStore(storeName);
+    const req   = fn(store);
+    if (req) {
+      req.onsuccess = () => resolve(req.result);
+      req.onerror   = () => reject(req.error);
+    } else {
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject(tx.error);
+    }
+  });
+}
+
+async function getAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function getById(storeName, id) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function putRecord(storeName, record) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).put(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function addRecord(storeName, record) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).add(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+/**
+ * Upsert a card into 'provisionedCards' store by cardNumberDec.
+ * Looks up an existing record with that cardNumberDec first;
+ * if found — updates it (preserving its auto-increment id);
+ * if not found — adds a new record.
+ * This avoids the unique-index violation that occurs when put()
+ * receives a record without an id field.
+ */
+async function upsertProvisionedCard(record) {
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction('provisionedCards', 'readwrite');
+    const store = tx.objectStore('provisionedCards');
+    const idx   = store.index('cardNumberDec');
+    const getReq = idx.get(String(record.cardNumberDec));
+    getReq.onsuccess = () => {
+      const existing = getReq.result;
+      const toWrite  = existing
+        ? { ...record, id: existing.id }   // preserve primary key → update
+        : { ...record };                    // no id → insert new
+      const putReq = store.put(toWrite);
+      putReq.onsuccess = () => resolve(putReq.result);
+      putReq.onerror   = () => reject(putReq.error);
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+async function deleteRecord(storeName, id) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+// ════════════════════════════════════════════════ CRYPTO ════════════════
+async function generateRandomBytes(length) {
+  return crypto.getRandomValues(new Uint8Array(length));
+}
+
+async function generateMasterSecret() {
+  const bytes = await generateRandomBytes(32);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function hashPin(pin, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(bits)));
+}
+
+async function hmacSha256(keyHex, data) {
+  const keyBytes = hexToBytes(keyHex);
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function aesGcmEncrypt(plaintext, keyHex) {
+  const keyBytes = hexToBytes(keyHex);
+  const iv       = await generateRandomBytes(12);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc.encode(plaintext));
+  const ivHex  = bytesToHex(iv);
+  const ctHex  = bytesToHex(new Uint8Array(ciphertext));
+  return ivHex + ':' + ctHex;
+}
+
+async function aesGcmDecrypt(encryptedPayload, keyHex) {
+  const [ivHex, ctHex] = encryptedPayload.split(':');
+  const keyBytes  = hexToBytes(keyHex);
+  const iv        = hexToBytes(ivHex);
+  const ciphertext = hexToBytes(ctHex);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
+  return new TextDecoder().decode(plaintext);
+}
+
+function hexToBytes(hex) {
+  const result = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) result[i / 2] = parseInt(hex.substr(i, 2), 16);
+  return result;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function computeMerchantIdHash(merchantId, masterSecret) {
+  const hmac = await hmacSha256(masterSecret, 'MERCHANT_ID:' + merchantId);
+  return hmac.substring(0, 8).toUpperCase();
+}
+
+// ════════════════════════════════════════════════ UI UTILITIES ════════════
+function showToast(message, type = 'info', duration = 4000) {
+  const colors = {
+    success: 'bg-emerald-900/90 border-emerald-700 text-emerald-100',
+    error:   'bg-red-900/90 border-red-700 text-red-100',
+    warn:    'bg-foxy-900/90 border-foxy-700 text-foxy-100',
+    info:    'bg-blue-900/90 border-blue-700 text-blue-100',
+  };
+  const icons = { success: '✅', error: '❌', warn: '⚠️', info: 'ℹ️' };
+  const toast = document.createElement('div');
+  toast.className = `pointer-events-auto flex items-start gap-3 p-3 rounded-xl border text-sm shadow-lg animate-slide-up ${colors[type] || colors.info}`;
+  toast.innerHTML = `<span class="text-base mt-0.5">${icons[type]||'ℹ️'}</span><span class="flex-1">${message}</span>`;
+  document.getElementById('toastContainer').appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(() => toast.remove(), 500); }, duration);
+}
+
+function showModal(html) {
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('tab-inactive'); });
+  document.getElementById('pane-' + name).classList.remove('hidden');
+  document.getElementById('tab-' + name).classList.add('tab-active');
+  document.getElementById('tab-' + name).classList.remove('tab-inactive');
+  if (name === 'dashboard') refreshDashboard();
+  if (name === 'merchants') renderMerchantTable();
+  if (name === 'audit') renderAuditLog();
+  if (name === 'preinit') {
+    renderPreinitCardTable();
+    startAcrPolling();
+    checkNfcSupport();
+  } else {
+    stopAcrPolling();
+    if (webNfcScanning) stopWebNfcPreInit();
+  }
+}
+
+let webNfcScanning = false;
+let webNfcAbortController = null;
+let webNfcSimulatorActive = false;
+
+function checkNfcSupport() {
+  const badge = document.getElementById('nfcSupportBadge');
+  const btn = document.getElementById('nfcPreInitBtn');
+  const btnText = document.getElementById('nfcBtnText');
+  const btnIcon = document.getElementById('nfcBtnIcon');
+  const desc = document.getElementById('webNfcStatusDesc');
+  const simPanel = document.getElementById('webNfcSimPanel');
+
+  if (webNfcSimulatorActive) {
+    if (badge) {
+      badge.className = 'px-2 py-0.5 text-xs font-semibold rounded-full badge-success flex items-center gap-1';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Симулятор Web NFC активен';
+    }
+    if (simPanel) simPanel.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Симулировать сканирование карты';
+    if (btnIcon) btnIcon.textContent = '💳';
+    if (btn) {
+      btn.className = 'w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30';
+      btn.disabled = false;
+    }
+    return true;
+  }
+
+  if (simPanel) simPanel.classList.add('hidden');
+
+  if ('NDEFReader' in window) {
+    if (badge) {
+      badge.className = 'px-2 py-0.5 text-xs font-semibold rounded-full badge-success flex items-center gap-1';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Web NFC доступен';
+    }
+    if (desc) desc.textContent = 'Аппаратный Web NFC поддерживается в текущем браузере. Вы можете сканировать карты.';
+    if (btnText) btnText.textContent = webNfcScanning ? 'Остановить сканирование' : 'Запустить Web NFC сканирование';
+    if (btnIcon) btnIcon.textContent = webNfcScanning ? '⏹️' : '📡';
+    if (btn) {
+      btn.className = webNfcScanning 
+        ? 'w-full py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/30'
+        : 'w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20';
+      btn.disabled = false;
+    }
+    return true;
+  } else {
+    if (badge) {
+      badge.className = 'px-2 py-0.5 text-xs font-semibold rounded-full badge-warn flex items-center gap-1';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> Требуется Chrome на Android';
+    }
+    if (desc) desc.textContent = 'Web NFC API работает в Google Chrome на смартфонах Android. На ПК используется USB-ридер (Method A) или встроенный симулятор.';
+    if (btnText) btnText.textContent = 'Активировать Web NFC / Симулятор';
+    if (btnIcon) btnIcon.textContent = '📡';
+    if (btn) {
+      btn.className = 'w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20';
+      btn.disabled = false;
+    }
+    return false;
+  }
+}
+
+function toggleVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function formatDecimalCard(decStr) {
+  // group in blocks of 4 from right
+  const s = decStr.replace(/\D/g, '');
+  return s.replace(/(\d)(?=(\d{4})+$)/g, '$1 ');
+}
+
+function formatTimestamp(ts) {
+  return new Date(ts).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+// ════════════════════════════════════════════════ AUDIT LOG ════════════════
+async function logAudit(action, merchantId, details) {
+  try {
+    await addRecord('auditLog', {
+      timestamp: new Date().toISOString(),
+      action,
+      merchantId: merchantId || null,
+      details: details || '',
+    });
+  } catch(e) { console.warn('Audit log failed:', e); }
+}
+
+// ════════════════════════════════════════════════ DASHBOARD ════════════════
+async function refreshDashboard() {
+  const [merchants, keys, cards, auditEvents] = await Promise.all([
+    getAll('merchants'), getAll('masterKeys'), getAll('provisionedCards'), getAll('auditLog')
+  ]);
+  document.getElementById('statMerchants').textContent = merchants.length;
+  document.getElementById('statKeys').textContent = keys.length;
+  document.getElementById('statCards').textContent = cards.length;
+  document.getElementById('statAudit').textContent = auditEvents.length;
+
+  const recent = auditEvents.slice(-8).reverse();
+  const recentEl = document.getElementById('recentAudit');
+  if (recent.length === 0) {
+    recentEl.innerHTML = '<div class="text-graphite-500">No activity yet.</div>';
+  } else {
+    recentEl.innerHTML = recent.map(a => `
+      <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-graphite-800/50">
+        <div class="text-xs text-graphite-500 w-32 shrink-0">${formatTimestamp(a.timestamp)}</div>
+        <div class="text-xs font-semibold text-foxy-400 uppercase">${a.action}</div>
+        <div class="text-xs text-graphite-400 truncate">${a.details}</div>
+      </div>`).join('');
+  }
+}
+
+// ════════════════════════════════════════════════ MERCHANTS ════════════════
+async function renderMerchantTable() {
+  const merchants = await getAll('merchants');
+  const tbody = document.getElementById('merchantTableBody');
+  if (merchants.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-graphite-500">No merchants registered yet. Add your first merchant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = merchants.map(m => `
+    <tr class="border-b border-graphite-800/50">
+      <td class="px-4 py-3 font-semibold text-white">${m.networkName}</td>
+      <td class="px-4 py-3 text-graphite-300">${m.locationName}</td>
+      <td class="px-4 py-3 font-mono text-graphite-400 text-xs">${m.terminalId}</td>
+      <td class="px-4 py-3 text-graphite-300">${m.currency}</td>
+      <td class="px-4 py-3 text-graphite-400">${m.validity}mo</td>
+      <td class="px-4 py-3 text-graphite-400 uppercase text-xs">${m.language}</td>
+      <td class="px-4 py-3"><span class="badge-success px-2 py-0.5 rounded-full text-xs font-semibold">Active</span></td>
+      <td class="px-4 py-3 flex gap-2 justify-end">
+        <button onclick="openMerchantForm(${m.id})" class="px-3 py-1 text-xs bg-graphite-800 hover:bg-graphite-700 text-graphite-300 hover:text-white rounded-lg transition-all">Edit</button>
+        <button onclick="deleteMerchant(${m.id})" class="px-3 py-1 text-xs bg-red-900/30 hover:bg-red-900/60 text-red-400 rounded-lg transition-all">Delete</button>
+      </td>
+    </tr>`).join('');
+  populateMerchantSelects(merchants);
+}
+
+function populateMerchantSelects(merchants) {
+  const selects = ['keyMerchantSel','pinMerchantSel','qrMerchantSel','preinitMerchantSel'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select Merchant —</option>';
+    merchants.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.networkName} — ${m.locationName} (${m.terminalId})`;
+      sel.appendChild(opt);
+    });
+    if (cur) {
+      sel.value = cur;
+    } else if (merchants.length > 0) {
+      sel.value = merchants[0].id;
+    }
+  });
+}
+
+async function openMerchantForm(id) {
+  const form = document.getElementById('merchantFormModal');
+  if (id) {
+    const m = await getById('merchants', id);
+    document.getElementById('merchantFormTitle').textContent = 'Edit Merchant Profile';
+    document.getElementById('mf_id').value         = m.id;
+    document.getElementById('mf_networkName').value = m.networkName;
+    document.getElementById('mf_locationName').value= m.locationName;
+    document.getElementById('mf_terminalId').value  = m.terminalId;
+    document.getElementById('mf_email').value       = m.email || '';
+    document.getElementById('mf_tgToken').value     = m.tgToken || '';
+    document.getElementById('mf_tgChatId').value    = m.tgChatId || '';
+    document.getElementById('mf_currency').value    = m.currency;
+    document.getElementById('mf_language').value    = m.language;
+    document.getElementById('mf_validity').value    = m.validity;
+    document.getElementById('mf_prolongation').value= m.prolongation;
+  } else {
+    document.getElementById('merchantFormTitle').textContent = 'New Merchant Profile';
+    ['mf_id','mf_networkName','mf_locationName','mf_terminalId','mf_email','mf_tgToken','mf_tgChatId'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('mf_currency').value    = 'EUR';
+    document.getElementById('mf_language').value    = 'en';
+    document.getElementById('mf_validity').value    = '6';
+    document.getElementById('mf_prolongation').value= '3';
+  }
+  form.classList.remove('hidden');
+}
+
+function closeMerchantForm() {
+  document.getElementById('merchantFormModal').classList.add('hidden');
+}
+
+async function saveMerchant() {
+  const networkName  = document.getElementById('mf_networkName').value.trim();
+  const locationName = document.getElementById('mf_locationName').value.trim();
+  const terminalId   = document.getElementById('mf_terminalId').value.trim();
+  if (!networkName || !locationName || !terminalId) { showToast('Network Name, Location, and Terminal ID are required.', 'error'); return; }
+
+  const record = {
+    networkName, locationName, terminalId,
+    email:       document.getElementById('mf_email').value.trim(),
+    tgToken:     document.getElementById('mf_tgToken').value.trim(),
+    tgChatId:    document.getElementById('mf_tgChatId').value.trim(),
+    currency:    document.getElementById('mf_currency').value,
+    language:    document.getElementById('mf_language').value,
+    validity:    parseInt(document.getElementById('mf_validity').value),
+    prolongation:parseInt(document.getElementById('mf_prolongation').value),
+    createdAt:   new Date().toISOString(),
+  };
+
+  const idVal = document.getElementById('mf_id').value;
+  if (idVal) {
+    record.id = parseInt(idVal);
+    await putRecord('merchants', record);
+    showToast(`Merchant "${networkName}" updated.`, 'success');
+    await logAudit('MERCHANT_UPDATE', record.id, `Updated: ${networkName} — ${locationName}`);
+  } else {
+    const newId = await addRecord('merchants', record);
+    showToast(`Merchant "${networkName}" created.`, 'success');
+    await logAudit('MERCHANT_CREATE', newId, `Created: ${networkName} — ${locationName} (${terminalId})`);
+  }
+  closeMerchantForm();
+  renderMerchantTable();
+}
+
+async function deleteMerchant(id) {
+  const m = await getById('merchants', id);
+  showModal(`
+    <div class="space-y-4">
+      <div class="text-lg font-bold text-red-400">⚠️ Delete Merchant</div>
+      <div class="text-sm text-graphite-300">Are you sure you want to delete merchant <strong class="text-white">"${m.networkName}"</strong>? This will also delete associated master keys and PIN configurations.</div>
+      <div class="flex gap-3 justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 border border-graphite-700 text-graphite-400 rounded-xl text-sm font-semibold">Cancel</button>
+        <button onclick="confirmDeleteMerchant(${id})" class="px-4 py-2 bg-red-700 hover:bg-red-600 text-white rounded-xl text-sm font-semibold">Delete</button>
+      </div>
+    </div>`);
+}
+
+async function confirmDeleteMerchant(id) {
+  const m = await getById('merchants', id);
+  await deleteRecord('merchants', id);
+  closeModal();
+  showToast(`Merchant "${m.networkName}" deleted.`, 'warn');
+  await logAudit('MERCHANT_DELETE', id, `Deleted: ${m.networkName}`);
+  renderMerchantTable();
+}
+
+// ════════════════════════════════════════════════ KEY MANAGEMENT ════════════════
+document.getElementById('keyMerchantSel').addEventListener('change', async function() {
+  const merchantId = parseInt(this.value);
+  if (!merchantId) { document.getElementById('existingKeyDisplay').classList.add('hidden'); return; }
+  const keys = await getAll('masterKeys');
+  const existing = keys.find(k => k.merchantId === merchantId);
+  if (existing) {
+    document.getElementById('existingKeyDisplay').classList.remove('hidden');
+    document.getElementById('masterKeyHex').textContent = existing.secretHex;
+    document.getElementById('masterKeyId').textContent = `Key ID: ${existing.keyId} | Generated: ${formatTimestamp(existing.createdAt)}`;
+  } else {
+    document.getElementById('existingKeyDisplay').classList.add('hidden');
+  }
+});
+
+async function generateMasterKey() {
+  const merchantId = parseInt(document.getElementById('keyMerchantSel').value);
+  if (!merchantId) { showToast('Please select a merchant first.', 'error'); return; }
+  const secretHex = await generateMasterSecret();
+  const keyId = 'KEY-' + Date.now().toString(36).toUpperCase();
+  const merchantIdHash = await computeMerchantIdHash(merchantId, secretHex);
+  const record = { merchantId, secretHex, keyId, merchantIdHash, createdAt: new Date().toISOString() };
+
+  // Remove existing keys for this merchant
+  const all = await getAll('masterKeys');
+  for (const k of all) {
+    if (k.merchantId === merchantId) await deleteRecord('masterKeys', k.id);
+  }
+  await addRecord('masterKeys', record);
+  document.getElementById('existingKeyDisplay').classList.remove('hidden');
+  document.getElementById('masterKeyHex').textContent = secretHex;
+  document.getElementById('masterKeyId').textContent = `Key ID: ${keyId} | Generated: just now`;
+  showToast('New Master Secret generated. Back up before use!', 'success');
+  await logAudit('KEY_GENERATE', merchantId, `New master key generated: ${keyId}`);
+}
+
+async function copyMasterKey() {
+  const val = document.getElementById('masterKeyHex').textContent;
+  if (!val) return;
+  await navigator.clipboard.writeText(val);
+  showToast('Master Secret copied to clipboard.', 'info');
+}
+
+async function savePins() {
+  const merchantId = parseInt(document.getElementById('pinMerchantSel').value);
+  if (!merchantId) { showToast('Please select a merchant.', 'error'); return; }
+  const adminPin   = document.getElementById('adminPinInput').value;
+  const cashierPin = document.getElementById('cashierPinInput').value;
+  const prolongPin = document.getElementById('prolongPinInput').value;
+  if (adminPin.length < 4 || cashierPin.length < 4 || prolongPin.length < 4) {
+    showToast('All PINs must be at least 4 digits.', 'error'); return;
+  }
+  if (!/^\d{4,6}$/.test(adminPin) || !/^\d{4,6}$/.test(cashierPin) || !/^\d{4,6}$/.test(prolongPin)) {
+    showToast('PINs must be 4–6 digits only.', 'error'); return;
+  }
+  const salt = await generateRandomBytes(32);
+  const saltHex = bytesToHex(salt);
+  const [adminHash, cashierHash, prolongHash] = await Promise.all([
+    hashPin(adminPin, salt), hashPin(cashierPin, salt), hashPin(prolongPin, salt)
+  ]);
+  await putRecord('pinConfig', { merchantId, adminHash, cashierHash, prolongHash, saltHex, updatedAt: new Date().toISOString() });
+  showToast('PIN configuration saved.', 'success');
+  await logAudit('PIN_SAVE', merchantId, 'PIN hierarchy configured');
+  ['adminPinInput','cashierPinInput','prolongPinInput'].forEach(id => document.getElementById(id).value = '');
+}
+
+// ════════════════════════════════════════════════ PROVISIONING QR ════════════════
+async function onQrMerchantChange() {
+  const merchantId = parseInt(document.getElementById('qrMerchantSel').value);
+  const btn = document.getElementById('generateQrBtn');
+  if (!merchantId) { btn.disabled = true; document.getElementById('qrMerchantInfo').classList.add('hidden'); return; }
+  const m = await getById('merchants', merchantId);
+  if (!m) return;
+  const info = document.getElementById('qrMerchantInfo');
+  info.classList.remove('hidden');
+  info.innerHTML = `
+    <div><span class="text-graphite-500">Network:</span> <strong class="text-white">${m.networkName}</strong></div>
+    <div><span class="text-graphite-500">Location:</span> ${m.locationName}</div>
+    <div><span class="text-graphite-500">Terminal:</span> <span class="font-mono">${m.terminalId}</span></div>
+    <div><span class="text-graphite-500">Currency:</span> ${m.currency} | <span class="text-graphite-500">Lang:</span> ${m.language.toUpperCase()}</div>`;
+  btn.disabled = false;
+}
+
+async function generateProvisioningQR() {
+  const merchantId = parseInt(document.getElementById('qrMerchantSel').value);
+  if (!merchantId) return;
+  const [m, keys, pins] = await Promise.all([
+    getById('merchants', merchantId), getAll('masterKeys'), getAll('pinConfig')
+  ]);
+  const key = keys.find(k => k.merchantId === merchantId);
+  const pin = pins.find(p => p.merchantId === merchantId);
+  if (!key) { showToast('No Master Key found. Generate one in Key Management first.', 'error'); return; }
+  if (!pin) { showToast('No PIN configuration found. Configure PINs first.', 'error'); return; }
+
+  const merchantIdHash = await computeMerchantIdHash(merchantId, key.secretHex);
+  const VENDOR_PROVISIONING_KEY_HEX = '466f78794769667456656e646f7250726f766973696f6e323032364b65792121';
+  const payload = {
+    v:   2,
+    mk:  key.secretHex,
+    net: m.networkName,
+    loc: m.locationName,
+    tid: m.terminalId,
+    mid: merchantId,
+    mh:  merchantIdHash,
+    cur: m.currency,
+    lng: m.language,
+    val: m.validity,
+    pro: m.prolongation,
+    tok: m.tgToken || '',
+    cid: m.tgChatId || '',
+    ah:  pin.adminHash,
+    ch:  pin.cashierHash,
+    ph:  pin.prolongHash,
+    s:   pin.saltHex,
+    ts:  Date.now(),
+  };
+
+  // Encrypt with offline Vendor Provisioning Master Key so any terminal can decrypt on first scan
+  const enc = new TextEncoder();
+  const rawKey = await crypto.subtle.importKey('raw', hexToBytes(VENDOR_PROVISIONING_KEY_HEX), 'AES-GCM', false, ['encrypt']);
+  const iv = await generateRandomBytes(12);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    rawKey,
+    enc.encode(JSON.stringify(payload))
+  );
+
+  const qrData = JSON.stringify({
+    t:   'FOXYGIFT_PROVISION_V2',
+    enc: 'b64',
+    iv:  bytesToBase64(iv),
+    ct:  bytesToBase64(new Uint8Array(ciphertext)),
+    kid: key.keyId,
+    mid: merchantId,
+  });
+
+  const qrDiv = document.getElementById('qrCodeDisplay');
+  qrDiv.innerHTML = '';
+  new QRCode(qrDiv, {
+    text: qrData,
+    width: 300,
+    height: 300,
+    correctLevel: QRCode.CorrectLevel.L,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+  });
+
+  document.getElementById('qrCodeCaption').classList.remove('hidden');
+  document.getElementById('qrCodeMerchantName').textContent = `${m.networkName} — ${m.locationName}`;
+  document.getElementById('qrCodeTimestamp').textContent = 'Generated: ' + new Date().toLocaleString();
+  document.getElementById('printQrBtn').disabled = false;
+
+  // Store for print
+  window._lastQrData = qrData;
+  window._lastMerchant = m;
+
+  showToast('Provisioning QR generated. AES-256-GCM encrypted.', 'success');
+  await logAudit('QR_GENERATE', merchantId, `Provisioning QR for ${m.networkName} — ${m.locationName}`);
+}
+
+async function printProvisioningSheet() {
+  if (!window._lastQrData || !window._lastMerchant) return;
+  const m = window._lastMerchant;
+  const table = document.getElementById('printSheetData');
+  table.innerHTML = [
+    ['Network Name', m.networkName], ['Location', m.locationName], ['Terminal ID', m.terminalId],
+    ['Currency', m.currency], ['Language', m.language.toUpperCase()],
+    ['Card Validity', m.validity + ' months'], ['Prolongation', m.prolongation + ' months'],
+    ['Generated', new Date().toLocaleString()],
+  ].map(([k,v]) => `<tr><td style="padding:4px 8px; font-weight:bold; width:40%;">${k}</td><td style="padding:4px 8px;">${v}</td></tr>`).join('');
+  document.getElementById('printTimestamp').textContent = new Date().toLocaleString();
+  const pc = document.getElementById('printQrContainer');
+  pc.innerHTML = '';
+  new QRCode(pc, { text: window._lastQrData, width: 260, height: 260, correctLevel: QRCode.CorrectLevel.L, colorDark: '#000000', colorLight: '#ffffff' });
+  document.getElementById('printSheet').classList.remove('hidden');
+  setTimeout(() => { window.print(); document.getElementById('printSheet').classList.add('hidden'); }, 200);
+}
+
+// ════════════════════════════════════════════════ AUDIO CHIMES (WEB AUDIO API) ════════════════
+let _audioCtx = null;
+function getAudioContext() {
+  if (!_audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) _audioCtx = new AudioContextClass();
+  }
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    _audioCtx.resume();
+  }
+  return _audioCtx;
+}
+
+function playSuccessChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Pleasant dual-tone chime: 880Hz (A5) then 1318.5Hz (E6)
+    const tones = [
+      { freq: 880.0, start: 0, dur: 0.35, gain: 0.18 },
+      { freq: 1318.51, start: 0.08, dur: 0.45, gain: 0.22 }
+    ];
+    tones.forEach(t => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(t.freq, now + t.start);
+      gain.gain.setValueAtTime(t.gain, now + t.start);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + t.start + t.dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + t.start);
+      osc.stop(now + t.start + t.dur);
+    });
+  } catch(e) { console.debug('Audio chime notice:', e); }
+}
+
+function playCardDetectedChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(659.25, now); // E5
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } catch(e) {}
+}
+
+function playErrorChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.3);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } catch(e) {}
+}
+
+function testAcrChime() {
+  playSuccessChime();
+  showToast('🔊 Audio chime test successful.', 'info');
+}
+
+// ════════════════════════════════════════════════ ACR1581U SMARTCARD CONTROLLER ════════════════
+const ACR_BRIDGE_URL = 'http://127.0.0.1:8989';
+let acrBridgeOnline = false;
+let acrPollTimer = null;
+let acrCurrentCard = null;
+let acrBatchMode = true; // Auto-init on placement ON by default!
+let acrLastHandledUid = null;
+let acrIsProcessing = false;
+let acrConsecutiveErrors = 0;
+let preinitSessionCount = 0;
+
+function formatUidHex(uid) {
+  if (!uid) return '—';
+  const clean = uid.replace(/[^0-9A-Fa-f]/g, '');
+  return clean.match(/.{1,2}/g)?.join(':').toUpperCase() || clean;
+}
+
+function setAcrBatchMode(enable) {
+  acrBatchMode = !!enable;
+  const checkbox = document.getElementById('acrAutoInitCheckbox');
+  const badge = document.getElementById('acrAutoBadge');
+  const banner = document.getElementById('acrConveyorBanner');
+
+  if (checkbox) checkbox.checked = acrBatchMode;
+  if (badge) {
+    if (acrBatchMode) {
+      badge.textContent = 'АКТИВНА';
+      badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+    } else {
+      badge.textContent = 'ОТКЛЮЧЕНА';
+      badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-graphite-700 text-graphite-400 border border-graphite-600';
+    }
+  }
+
+  if (banner) {
+    if (acrBatchMode) {
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  if (acrBatchMode) {
+    playSuccessChime();
+    showToast('⚡ Авто-прошивка активна! Прикладывайте карты к ридеру.', 'success');
+    if (acrCurrentCard && !acrIsProcessing && acrLastHandledUid !== acrCurrentCard.uid && !acrCurrentCard.isFoxy) {
+      executeAcrPreinit(acrCurrentCard);
+    }
+  } else {
+    showToast('Авто-прошивка отключена. Используйте кнопку «Прошить карту».', 'info');
+  }
+}
+
+function toggleAcrBatchMode() {
+  setAcrBatchMode(!acrBatchMode);
+}
+
+async function checkAcrBridge(manualRefresh = false) {
+  const badge = document.getElementById('acrBridgeBadge');
+  const subtext = document.getElementById('acrReaderSubtext');
+  const readerSelectWrap = document.getElementById('acrReaderSelectWrap');
+  const readerSelect = document.getElementById('acrReaderSelect');
+
+  try {
+    const res = await fetch(ACR_BRIDGE_URL + '/api/readers', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const readers = data.readers || [];
+
+    acrBridgeOnline = true;
+    acrConsecutiveErrors = 0;
+    if (readers.length > 0) {
+      // Find preferred ACR1581 PICC reader
+      let preferred = readers.find(r => r.toUpperCase().includes('PICC') || r.toUpperCase().includes('CONTACTLESS')) || readers[0];
+      badge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full badge-success flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Bridge Connected';
+
+      // Populate reader selector
+      const currentSelected = readerSelect.value;
+      readerSelect.innerHTML = '';
+      readers.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        let prefix = '💳 ';
+        if (r.toUpperCase().includes('PICC') || r.toUpperCase().includes('CONTACTLESS')) {
+          prefix = '🏷️ [Бесконтактный PICC] ';
+        } else if (r.toUpperCase().includes('ICC')) {
+          prefix = '🔌 [Контактный слот ICC] ';
+        } else if (r.toUpperCase().includes('SAM')) {
+          prefix = '🔐 [SAM модуль] ';
+        }
+        opt.textContent = prefix + r;
+        if (currentSelected && r === currentSelected) {
+          opt.selected = true;
+        } else if (!currentSelected && r === preferred) {
+          opt.selected = true;
+        }
+        readerSelect.appendChild(opt);
+      });
+
+      const activeReader = readerSelect.value || preferred;
+      subtext.textContent = `Интерфейс: ${activeReader}`;
+      subtext.className = 'text-xs text-emerald-400 truncate max-w-sm';
+
+      if (readers.length > 1) {
+        readerSelectWrap.classList.remove('hidden');
+      } else {
+        readerSelectWrap.classList.add('hidden');
+      }
+
+      if (manualRefresh) showToast(`ACR1581U подключен: ${activeReader}`, 'success');
+    } else {
+      badge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full badge-warn flex items-center gap-1.5';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> No Readers';
+      subtext.textContent = 'Bridge active, but no USB smart card readers detected. Plug in ACR1581U.';
+      subtext.className = 'text-xs text-amber-400';
+      if (manualRefresh) showToast('Bridge is running, but no USB reader was detected.', 'warn');
+    }
+  } catch (err) {
+    acrBridgeOnline = false;
+    badge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full badge-error flex items-center gap-1.5';
+    badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span> Bridge Offline';
+    subtext.textContent = 'PC/SC bridge offline. Run web/bridge/run_bridge.bat to enable ACR1581U.';
+    subtext.className = 'text-xs text-red-400';
+    if (manualRefresh) showToast('Could not connect to PC/SC bridge on http://127.0.0.1:8989.', 'error');
+  }
+}
+
+function startAcrPolling() {
+  checkAcrBridge();
+  if (acrPollTimer) clearInterval(acrPollTimer);
+  acrPollTimer = setInterval(pollAcrCard, 700);
+}
+
+function stopAcrPolling() {
+  if (acrPollTimer) {
+    clearInterval(acrPollTimer);
+    acrPollTimer = null;
+  }
+}
+
+async function pollAcrCard() {
+  if (!acrBridgeOnline) {
+    // Retry bridge connection occasionally
+    if (Math.random() < 0.25) checkAcrBridge();
+    return;
+  }
+
+  // Concurrency guard: do NOT poll /api/card while /api/preinit is writing to card!
+  if (acrIsProcessing) return;
+
+  try {
+    const selReader = document.getElementById('acrReaderSelect')?.value || '';
+    const cardUrl = ACR_BRIDGE_URL + '/api/card' + (selReader ? '?reader=' + encodeURIComponent(selReader) : '');
+    const res = await fetch(cardUrl, { cache: 'no-store' });
+    if (!res.ok) {
+      acrConsecutiveErrors++;
+      if (acrConsecutiveErrors >= 4) acrBridgeOnline = false;
+      return;
+    }
+    const data = await res.json();
+    acrConsecutiveErrors = 0;
+
+    // If reader is disconnected or missing, refresh bridge reader status
+    if (data.error && data.error.toLowerCase().includes('no smart card reader')) {
+      const badge = document.getElementById('acrBridgeBadge');
+      const subtext = document.getElementById('acrReaderSubtext');
+      if (badge) {
+        badge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full badge-warn flex items-center gap-1.5';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> No Readers';
+      }
+      if (subtext) {
+        subtext.textContent = 'Bridge active, but reader unplugged. Plug in ACR1581U...';
+        subtext.className = 'text-xs text-amber-400';
+      }
+    } else if (Math.random() < 0.05) {
+      // Periodically refresh reader names in case reader was reconnected
+      checkAcrBridge();
+    }
+
+    const radarIdle = document.getElementById('acrRadarIdle');
+    const radarCard = document.getElementById('acrRadarCardPresent');
+    const manualBtn = document.getElementById('acrManualPreinitBtn');
+    const inspectBtn = document.getElementById('acrInspectBtn');
+    const prompt = document.getElementById('acrConveyorPrompt');
+
+    if (data.present) {
+      radarIdle.classList.add('hidden');
+      radarCard.classList.remove('hidden');
+
+      // Update card details in UI
+      document.getElementById('acrCardNumberDisplay').textContent = formatDecimalCard(data.cardNumberDec || '0');
+      document.getElementById('acrCardUidDisplay').textContent = formatUidHex(data.uid);
+      document.getElementById('acrCardCcDisplay').textContent = data.cc ? data.cc.toUpperCase() : '—';
+      
+      const chipBadge = document.getElementById('acrCardChipTypeBadge');
+      chipBadge.textContent = data.chipType || 'NTAG';
+      if (data.isCompatible === false) {
+        chipBadge.className = 'px-2 py-0.5 text-xs font-bold rounded-full bg-rose-900/80 text-rose-300 border border-rose-600 animate-pulse';
+      } else {
+        chipBadge.className = 'px-2 py-0.5 text-xs font-semibold rounded-full bg-graphite-700 text-graphite-300';
+      }
+
+      manualBtn.disabled = false;
+      inspectBtn.disabled = false;
+      const testNtagBtn = document.getElementById('acrTestNtagBtn');
+      if (testNtagBtn) testNtagBtn.disabled = false;
+      const ndefBtn = document.getElementById('acrNdefBtn');
+      if (ndefBtn) ndefBtn.disabled = false;
+
+      const manualBtnText = document.getElementById('acrManualBtnText');
+      const magicEl = document.getElementById('acrCardMagicDisplay');
+      const foxyEl  = document.getElementById('acrCardFoxyStatusDisplay');
+      if (data.isCompatible === false) {
+        if (magicEl) { magicEl.textContent = '❌ Несовместима'; magicEl.className = 'font-mono text-rose-400 ml-1 font-bold'; }
+        if (foxyEl)  { foxyEl.textContent = `❌ ${data.chipType || 'Несовместимый чип'}`; foxyEl.className = 'ml-1 text-rose-400 font-semibold'; }
+        if (manualBtnText) manualBtnText.textContent = `⚠️ Несовместима (${data.chipType || 'MIFARE'})`;
+        manualBtn.className = 'flex-1 py-3 px-5 bg-rose-900/90 hover:bg-rose-800 text-rose-100 rounded-xl font-bold text-sm border border-rose-600 transition-all flex items-center justify-center gap-2 shadow-lg';
+      } else if (data.isFoxy) {
+        if (magicEl) { magicEl.textContent = 'FOXY (Genuine)'; magicEl.className = 'font-mono text-emerald-400 ml-1 font-bold'; }
+        if (foxyEl)  { foxyEl.textContent = '✅ Pre-Initialized'; foxyEl.className = 'ml-1 text-emerald-400 font-semibold'; }
+        if (manualBtnText) manualBtnText.textContent = 'Перепрошить карту (Init Card)';
+        manualBtn.className = 'flex-1 py-3 px-5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm border border-emerald-500/40 transition-all flex items-center justify-center gap-2 shadow-lg';
+      } else if (data.isLocked) {
+        if (magicEl) { magicEl.textContent = '🔒 Locked (Page 4 Protected)'; magicEl.className = 'font-mono text-amber-400 ml-1'; }
+        if (foxyEl)  { foxyEl.textContent = '🔒 Hardware Password Locked'; foxyEl.className = 'ml-1 text-amber-400 font-semibold'; }
+        if (manualBtnText) manualBtnText.textContent = '🔒 Карта защищена паролем';
+        manualBtn.className = 'flex-1 py-3 px-5 bg-amber-900/90 hover:bg-amber-800 text-amber-100 rounded-xl font-bold text-sm border border-amber-600 transition-all flex items-center justify-center gap-2 shadow-lg';
+      } else {
+        if (magicEl) { magicEl.textContent = data.page4 ? data.page4.toUpperCase() : 'Blank'; magicEl.className = 'font-mono text-graphite-300 ml-1'; }
+        if (foxyEl)  { foxyEl.textContent = '🆕 Blank Tag (Uninitialized)'; foxyEl.className = 'ml-1 text-blue-400 font-semibold'; }
+        if (manualBtnText) manualBtnText.textContent = '🎯 Прошить карту (Init Card)';
+        manualBtn.className = 'flex-1 py-3 px-5 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm border border-foxy-500/30 transition-all flex items-center justify-center gap-2 shadow-lg animate-pulse';
+      }
+
+      // If card newly placed, play blip
+      if (!acrCurrentCard || acrCurrentCard.uid !== data.uid) {
+        playCardDetectedChime();
+      }
+      acrCurrentCard = data;
+
+      // Conveyor Auto-Batch Mode Execution & Status Prompts
+      if (data.isCompatible === false) {
+        if (prompt) {
+          prompt.classList.remove('hidden');
+          prompt.innerHTML = `❌ <strong class="text-rose-400">${data.compatibilityNotice || 'Несовместимый тип карты.'}</strong><br><span class="text-xs text-graphite-300">FoxyGift POS работает только с чипами NXP NTAG213/215/216. Снимите эту карту.</span>`;
+        }
+      } else if (acrBatchMode && !acrIsProcessing) {
+        if (data.isFoxy) {
+          if (prompt) {
+            prompt.classList.remove('hidden');
+            prompt.innerHTML = '✅ <strong class="text-emerald-400">Карта уже прошита (FOXY).</strong> Уберите карту для следующей…';
+          }
+        } else if (data.isLocked) {
+          if (prompt) {
+            prompt.classList.remove('hidden');
+            prompt.innerHTML = '🔒 <strong class="text-amber-400">Чип защищен паролем.</strong> Перезапись отклонена во избежание порчи.';
+          }
+        } else if (acrLastHandledUid !== data.uid) {
+          if (prompt) {
+            prompt.classList.remove('hidden');
+            prompt.innerHTML = '⚡ <strong class="text-amber-300">Идет прошивка чипа…</strong> Не убирайте карту с ридера!';
+          }
+          await executeAcrPreinit(data);
+        } else {
+          if (prompt) {
+            prompt.classList.remove('hidden');
+            prompt.innerHTML = '✅ <strong class="text-emerald-400">Карта готова!</strong> Снимите карту для перехода к следующей…';
+          }
+        }
+      } else if (!acrBatchMode) {
+        if (prompt) {
+          prompt.classList.remove('hidden');
+          if (data.isFoxy) {
+            prompt.innerHTML = '✅ <span class="text-emerald-400 font-semibold">Карта уже прошита (FOXY).</span>';
+          } else {
+            prompt.innerHTML = '🎯 <span class="text-foxy-400 font-semibold">Карта на ридере.</span> Нажмите «Прошить карту» для записи.';
+          }
+        }
+      }
+    } else {
+      // No card on reader
+      radarIdle.classList.remove('hidden');
+      radarCard.classList.add('hidden');
+      manualBtn.disabled = true;
+      inspectBtn.disabled = true;
+      const testNtagBtn = document.getElementById('acrTestNtagBtn');
+      if (testNtagBtn) testNtagBtn.disabled = true;
+      const ndefBtn = document.getElementById('acrNdefBtn');
+      if (ndefBtn) ndefBtn.disabled = true;
+      manualBtn.className = 'flex-1 py-3 px-5 bg-foxy-600 hover:bg-foxy-500 disabled:bg-graphite-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm border border-foxy-500/30 disabled:border-graphite-700 transition-all flex items-center justify-center gap-2 shadow-lg';
+      const manualBtnText = document.getElementById('acrManualBtnText');
+      if (manualBtnText) manualBtnText.textContent = 'Прошить карту (Init Card)';
+      if (prompt) prompt.classList.add('hidden');
+
+      // Reset handled UID when card is lifted
+      acrCurrentCard = null;
+      acrLastHandledUid = null;
+      acrIsProcessing = false;
+    }
+  } catch (err) {
+    acrConsecutiveErrors++;
+    if (acrConsecutiveErrors >= 4) {
+      console.warn('Bridge connection lost:', err);
+      acrBridgeOnline = false;
+    }
+  }
+}
+
+async function manualPreinitCurrentCard() {
+  const btn = document.getElementById('acrManualPreinitBtn');
+  if (btn) btn.blur();
+  if (!acrCurrentCard) {
+    showToast('Приложите карту к ридеру ACR1581U.', 'error');
+    return;
+  }
+  if (acrCurrentCard.isCompatible === false) {
+    playErrorChime();
+    showModal(`
+      <div class="space-y-4">
+        <div class="flex items-center gap-3 text-rose-400 font-bold text-lg border-b border-graphite-800 pb-3">
+          <span class="text-2xl">⚠️</span> Несовместимый тип карты
+        </div>
+        <div class="text-sm text-graphite-200">
+          На ридере обнаружена карта: <strong class="text-white font-mono">${acrCurrentCard.chipType || 'MIFARE'}</strong> (UID: ${formatUidHex(acrCurrentCard.uid)}).
+        </div>
+        <div class="p-3 rounded-xl bg-rose-950/40 border border-rose-800 text-xs text-rose-300 space-y-1.5">
+          <div><strong>Почему нельзя прошить:</strong></div>
+          <div>${acrCurrentCard.compatibilityNotice || 'Для FoxyGift требуются чипы NXP NTAG213/215/216.'}</div>
+          <div class="text-graphite-300">Стандартные NFC POS-терминалы на Android-смартфонах физически не поддерживают чтение карт MIFARE Classic из-за закрытого проприетарного шифрования Crypto-1.</div>
+        </div>
+        <div class="text-xs text-graphite-400">
+          Для подарочных и бонусных карт FoxyGift используйте чипы стандарта <strong>NFC Forum Type 2 (NXP NTAG213, NTAG215 или NTAG216)</strong>.
+        </div>
+        <div class="flex justify-end pt-2">
+          <button onclick="closeModal()" class="px-4 py-2 bg-graphite-800 hover:bg-graphite-700 text-white rounded-xl text-xs font-semibold">Понятно</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+  if (acrCurrentCard.isLocked) {
+    playErrorChime();
+    showToast('Карта защищена аппаратным паролем (Locked). Перезапись отклонена.', 'warn');
+    return;
+  }
+  await executeAcrPreinit(acrCurrentCard);
+}
+
+async function executeAcrPreinit(cardData) {
+  if (acrIsProcessing) return;
+  acrIsProcessing = true;
+
+  const merchantId = parseInt(document.getElementById('preinitMerchantSel').value);
+  if (!merchantId) {
+    playErrorChime();
+    showToast('Выберите целевого торговца (Target Merchant).', 'error');
+    acrIsProcessing = false;
+    return;
+  }
+
+  const [m, keys] = await Promise.all([
+    getById('merchants', merchantId),
+    getAll('masterKeys')
+  ]);
+  const key = keys.find(k => k.merchantId === merchantId);
+  if (!key) {
+    playErrorChime();
+    showToast(`Мастер-ключ для торговца "${m ? m.networkName : merchantId}" не найден. Создайте его во вкладке Key Management.`, 'error');
+    acrIsProcessing = false;
+    return;
+  }
+
+  const chipTypeChoice = document.getElementById('chipTypeSel')?.value || 'AUTO';
+  const chipType = (chipTypeChoice === 'AUTO') ? (cardData.chipType || 'AUTO') : chipTypeChoice;
+  const merchantIdHash = await computeMerchantIdHash(merchantId, key.secretHex);
+
+  try {
+    const selReader = document.getElementById('acrReaderSelect')?.value || '';
+    const payload = {
+      merchantId: merchantId,
+      terminalId: m.terminalId || 'TERM-001',
+      merchantIdHash: merchantIdHash,
+      masterKeyHex: key.secretHex,
+      chipType: chipType,
+      reader: selReader,
+    };
+
+    const res = await fetch(ACR_BRIDGE_URL + '/api/preinit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || !result.success) {
+      const err = new Error(result.userHint || result.error || 'Bridge pre-init failed');
+      err.details = result;
+      throw err;
+    }
+
+    // Success!
+    playSuccessChime();
+    acrLastHandledUid = cardData.uid;
+
+    const cardNumberDec = result.cardNumberDec || cardData.cardNumberDec;
+    const finalChipType = result.chipType || chipType;
+
+    await upsertProvisionedCard({
+      timestamp: new Date().toISOString(),
+      cardNumberDec,
+      merchantId,
+      chipType: finalChipType,
+      status: 'SUCCESS',
+      networkName: m.networkName,
+    });
+
+    preinitSessionCount++;
+    document.getElementById('preinitCountBadge').textContent = preinitSessionCount;
+    addPreinitLogEntry(cardNumberDec, finalChipType, 'SUCCESS');
+    await logAudit('CARD_PREINIT', merchantId, `Card ${formatDecimalCard(cardNumberDec)} locked & pre-initialized via ACR1581U (${finalChipType})`);
+
+    showToast(`✅ Карта ${formatDecimalCard(cardNumberDec)} успешно прошита и заблокирована!`, 'success');
+    renderPreinitCardTable();
+
+    // Update prompt
+    const prompt = document.getElementById('acrConveyorPrompt');
+    if (prompt) {
+      prompt.classList.remove('hidden');
+      prompt.innerHTML = '✅ <strong class="text-emerald-400">Карта успешно прошита!</strong> Снимите карту для перехода к следующей…';
+    }
+  } catch (err) {
+    playErrorChime();
+    acrLastHandledUid = cardData.uid; // Hold on current card until lifted
+    const d = err.details || {};
+    const stage = d.stage || 'FAIL';
+    const pageStr = d.page != null ? ` (p.${d.page})` : '';
+    const swStr = d.sw ? ` [SW=${d.sw}]` : '';
+    const hint = d.userHint || err.message;
+    const cardId = cardData.cardNumberDec || cardData.uid || 'UNKNOWN';
+
+    addPreinitLogEntry(cardId, chipType, `FAIL: ${stage}${pageStr}`);
+    await logAudit('CARD_PREINIT_FAIL', merchantId, `Pre-init failed on card ${formatDecimalCard(cardId)}: ${stage}${pageStr}${swStr} — ${hint}`);
+
+    showToast(`❌ Ошибка записи [${stage}${pageStr}]: ${hint}`, 'error', 6000);
+
+    const prompt = document.getElementById('acrConveyorPrompt');
+    if (prompt) {
+      prompt.classList.remove('hidden');
+      prompt.innerHTML = `⚠️ <strong class="text-red-400">Ошибка [${stage}]:</strong> ${hint}<br><span class="text-graphite-400 text-xs">Уберите карту с ридера для сброса ошибки.</span>`;
+    }
+  } finally {
+    acrIsProcessing = false;
+  }
+}
+
+async function inspectAcrCard() {
+  if (!acrCurrentCard) {
+    showToast('No card detected on reader.', 'error');
+    return;
+  }
+
+  showModal(`
+    <div class="space-y-4">
+      <div class="flex items-center justify-between border-b border-graphite-800 pb-3">
+        <div class="text-lg font-bold text-white flex items-center gap-2">
+          <span>🔍</span> Tag Memory Inspection
+        </div>
+        <span class="text-xs font-mono text-foxy-400 font-semibold">${formatDecimalCard(acrCurrentCard.cardNumberDec)}</span>
+      </div>
+      <div class="text-xs text-graphite-400">Reading memory pages 00 to 16 from ACR1581U PICC…</div>
+      <div id="inspectMemoryDump" class="bg-graphite-950 p-3 rounded-xl border border-graphite-800 font-mono text-xs text-graphite-300 max-h-64 overflow-y-auto">
+        Reading memory…
+      </div>
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal()" class="px-4 py-2 bg-graphite-800 hover:bg-graphite-700 text-white rounded-xl text-xs font-semibold">Close</button>
+      </div>
+    </div>
+  `);
+
+  try {
+    const dumpEl = document.getElementById('inspectMemoryDump');
+    let html = '<table class="w-full text-left"><thead><tr class="text-graphite-500 border-b border-graphite-800"><th class="py-1">Page</th><th>Hex</th><th>ASCII</th><th>Description</th></tr></thead><tbody>';
+
+    // Read pages 0..16 using Read Binary APDU FF B0 00 <page> 04 (strictly 4 bytes per page)
+    const selReader = document.getElementById('acrReaderSelect')?.value || '';
+    for (let p = 0; p <= 16; p++) {
+      const pageHex = p.toString(16).padStart(2, '0');
+      const apdu = `FFB000${pageHex}04`;
+      const res = await fetch(ACR_BRIDGE_URL + '/api/transmit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apdu, reader: selReader }),
+      });
+      const resJson = await res.json().catch(() => ({}));
+      if (resJson.success && resJson.data) {
+        const chunk = resJson.data.padEnd(8, '0');
+        let ascii = '';
+        for (let i = 0; i < chunk.length; i += 2) {
+          const byteVal = parseInt(chunk.substr(i, 2), 16);
+          ascii += (byteVal >= 32 && byteVal <= 126) ? String.fromCharCode(byteVal) : '·';
+        }
+        let desc = 'User Memory';
+        if (p === 0) desc = 'UID / Serial Low';
+        else if (p === 1) desc = 'UID Serial High';
+        else if (p === 2) desc = 'Internal / Lock Bytes';
+        else if (p === 3) desc = 'Capability Container (CC)';
+        else if (p === 4) desc = chunk.toUpperCase() === '464F5859' ? '<strong class="text-emerald-400">FOXY Magic</strong>' : 'Magic Marker';
+        else if (p === 5) desc = 'Merchant ID Hash';
+        else if (p >= 6 && p <= 7) desc = 'Nominal Value (cents)';
+        else if (p >= 8 && p <= 9) desc = 'Current Balance (cents)';
+        else if (p >= 10 && p <= 11) desc = 'Expiry Epoch';
+        else if (p === 12) desc = 'Status Byte';
+        else if (p >= 13 && p <= 16) desc = 'Digital HMAC Signature';
+
+        html += `<tr class="border-b border-graphite-900"><td class="py-1 text-foxy-400 font-bold">${p.toString().padStart(2, '0')}</td><td class="font-mono text-white">${chunk.toUpperCase()}</td><td class="text-graphite-400 font-mono">${ascii}</td><td class="text-graphite-400 text-[11px]">${desc}</td></tr>`;
+      } else {
+        const sw = resJson.sw || 'ERR';
+        let errDesc = `[SW=${sw}] Ошибка чтения`;
+        if (sw === '6982') errDesc = `[SW=6982] 🔒 Защищено паролем (PWD Auth required)`;
+        else if (sw === '6300') errDesc = `[SW=6300] ❌ Ошибка доступа / NAK`;
+        else if (sw === '6A82') errDesc = `[SW=6A82] 🚫 Вне границы памяти чипа`;
+
+        let desc = p === 4 ? 'FOXY Magic (Заблокировано)' : 'User Memory';
+        html += `<tr class="border-b border-graphite-900 bg-amber-950/20"><td class="py-1 text-foxy-400 font-bold">${p.toString().padStart(2, '0')}</td><td class="font-mono text-amber-400 text-[11px]" colspan="2">${errDesc}</td><td class="text-graphite-500 text-[11px]">${desc}</td></tr>`;
+      }
+    }
+    html += '</tbody></table>';
+    dumpEl.innerHTML = html;
+  } catch (e) {
+    const dumpEl = document.getElementById('inspectMemoryDump');
+    if (dumpEl) dumpEl.innerHTML = `<span class="text-red-400">Read error: ${e.message}</span>`;
+  }
+}
+
+async function testNtag213Page4() {
+  if (!acrCurrentCard) {
+    showToast('Приложите карту NTAG213 к ридеру ACR1581U.', 'error');
+    return;
+  }
+  const selReader = document.getElementById('acrReaderSelect')?.value || '';
+  showToast('Отправка APDU записи 4 байт (TEST) на страницу 4...', 'info');
+
+  try {
+    // 1. Write 4 bytes 'TEST' -> [0x54, 0x45, 0x53, 0x54] via FF D6 00 04 04 54455354
+    const writeRes = await fetch(ACR_BRIDGE_URL + '/api/transmit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apdu: 'FFD600040454455354', reader: selReader })
+    });
+    const writeJson = await writeRes.json().catch(() => ({}));
+    if (!writeJson.success && writeJson.sw !== '9000') {
+      throw new Error(`Ошибка записи на стр. 04: SW=${writeJson.sw || 'ERR'}. (Возможно, чип уже защищен паролем)`);
+    }
+
+    // 2. Read back 4 bytes via FF B0 00 04 04
+    const readRes = await fetch(ACR_BRIDGE_URL + '/api/transmit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apdu: 'FFB0000404', reader: selReader })
+    });
+    const readJson = await readRes.json().catch(() => ({}));
+    if (!readJson.success && readJson.sw !== '9000') {
+      throw new Error(`Ошибка чтения стр. 04: SW=${readJson.sw || 'ERR'}`);
+    }
+
+    const hex = (readJson.data || '').toUpperCase();
+    playSuccessChime();
+    showModal(`
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 border-b border-graphite-800 pb-3 text-emerald-400 font-bold text-lg">
+          <span class="text-2xl">✅</span> Тест записи NTAG213 успешен!
+        </div>
+        <div class="text-xs text-graphite-300 space-y-2 leading-relaxed">
+          <div>Команды ридера ACR1581U выполнены строго по стандарту NTAG213 (блоки по 4 байта):</div>
+          <div class="p-3 bg-graphite-950 rounded-xl border border-graphite-800 font-mono text-xs space-y-1.5">
+            <div class="text-graphite-400">UID чипа: <span class="text-white">${formatUidHex(acrCurrentCard.uid)}</span> (7 байт)</div>
+            <div class="text-graphite-400">Команда записи: <span class="text-amber-400">FF D6 00 04 04 54 45 53 54</span> (SW=9000)</div>
+            <div class="text-graphite-400">Команда чтения: <span class="text-blue-400">FF B0 00 04 04</span> (SW=9000)</div>
+            <div class="text-graphite-400">Считанные данные: <span class="text-emerald-400 font-bold">${hex}</span> ('TEST')</div>
+          </div>
+          <div class="text-emerald-300 text-xs">
+            ✨ Память чипа NTAG213 полностью доступна для 4-байтной записи и чтения.
+          </div>
+        </div>
+        <div class="flex justify-end pt-2">
+          <button onclick="closeModal()" class="px-4 py-2 bg-graphite-800 hover:bg-graphite-700 text-white rounded-xl text-xs font-semibold">Закрыть</button>
+        </div>
+      </div>
+    `);
+    pollAcrCard();
+  } catch (err) {
+    playErrorChime();
+    showToast(err.message, 'error');
+  }
+}
+
+function openNdefUrlModal() {
+  if (!acrCurrentCard) {
+    showToast('Приложите карту NTAG213 к ридеру.', 'error');
+    return;
+  }
+  showModal(`
+    <div class="space-y-4">
+      <div class="flex items-center gap-2 border-b border-graphite-800 pb-3">
+        <span class="text-2xl">🔗</span>
+        <div>
+          <div class="text-base font-bold text-white">Запись NDEF URL на NTAG213</div>
+          <div class="text-xs text-graphite-400">Сформировать NFC Forum Type 2 TLV-пакет со ссылкой</div>
+        </div>
+      </div>
+      <div class="text-xs text-graphite-300 space-y-2">
+        <p>Ссылка будет автоматически открываться в браузере любого смартфона (Android / iOS) при касании метки:</p>
+        <div>
+          <label class="text-[11px] text-graphite-400 font-semibold uppercase tracking-wider">URL адрес</label>
+          <input type="url" id="ndefUrlInput" value="https://foxygift.ru" class="mt-1 w-full bg-graphite-900 border border-graphite-700 rounded-xl px-3 py-2 text-white text-xs font-mono focus:border-foxy-500 focus:outline-none" placeholder="https://example.com" />
+        </div>
+        <div class="text-[11px] text-graphite-400">
+          Скрипт автоматически применит префикс сжатия NFC Forum (0x04 для https://) и запишет данные по 4 байта, начиная со стр. 04.
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-graphite-800">
+        <button onclick="closeModal()" class="px-4 py-2 bg-graphite-800 hover:bg-graphite-700 text-graphite-300 rounded-xl text-xs font-semibold">Отмена</button>
+        <button onclick="writeNdefUrlViaAcr(document.getElementById('ndefUrlInput').value)" class="px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl text-xs font-bold shadow-lg">Записать NDEF</button>
+      </div>
+    </div>
+  `);
+}
+
+function encodeNdefUrlBytes(url) {
+  const prefixes = {
+    'http://www.': 0x01,
+    'https://www.': 0x02,
+    'http://': 0x03,
+    'https://': 0x04
+  };
+  let prefixByte = 0x00;
+  let body = url;
+  for (const [pfx, code] of Object.entries(prefixes)) {
+    if (url.startsWith(pfx)) {
+      prefixByte = code;
+      body = url.slice(pfx.length);
+      break;
+    }
+  }
+  const bodyBytes = Array.from(new TextEncoder().encode(body));
+  const payload = [prefixByte, ...bodyBytes];
+  const payloadLen = payload.length;
+  // NDEF Record: 0xD1 (SR=1, TNF=0x01), 0x01 (Type len), payloadLen, 0x55 ('U')
+  const ndefRecord = [0xD1, 0x01, payloadLen, 0x55, ...payload];
+  // TLV Wrapper: 0x03 (NDEF Message), len, record, 0xFE (Terminator TLV)
+  return [0x03, ndefRecord.length, ...ndefRecord, 0xFE];
+}
+
+async function writeNdefUrlViaAcr(targetUrl) {
+  if (!acrCurrentCard) {
+    showToast('Приложите карту к ридеру.', 'error');
+    return;
+  }
+  if (!targetUrl || !targetUrl.trim()) {
+    showToast('Введите корректный URL (например https://...)', 'warn');
+    return;
+  }
+  targetUrl = targetUrl.trim();
+  const ndefBytes = encodeNdefUrlBytes(targetUrl);
+  const totalLen = ndefBytes.length;
+  const requiredPages = Math.ceil(totalLen / 4);
+
+  if (4 + requiredPages > 40) {
+    showToast('Ошибка: Ссылка слишком длинная для NTAG213 (максимум 144 байта)', 'error');
+    return;
+  }
+
+  // Pad to multiple of 4
+  const padding = (4 - (totalLen % 4)) % 4;
+  for (let i = 0; i < padding; i++) ndefBytes.push(0x00);
+
+  const selReader = document.getElementById('acrReaderSelect')?.value || '';
+  showToast(`Запись NDEF URL (${requiredPages} страниц)...`, 'info');
+
+  try {
+    for (let i = 0; i < requiredPages; i++) {
+      const page = 4 + i;
+      const chunk = ndefBytes.slice(i * 4, (i + 1) * 4);
+      const chunkHex = chunk.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const pageHex = page.toString(16).padStart(2, '0').toUpperCase();
+      const apdu = `FFD600${pageHex}04${chunkHex}`;
+
+      const res = await fetch(ACR_BRIDGE_URL + '/api/transmit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apdu, reader: selReader })
+      });
+      const resJson = await res.json().catch(() => ({}));
+      if (!resJson.success && resJson.sw !== '9000') {
+        throw new Error(`Ошибка записи на странице ${page} (SW=${resJson.sw || 'ERR'})`);
+      }
+    }
+
+    playSuccessChime();
+    showToast(`✅ Ссылка успешно записана на NTAG213 по стандарту NDEF!`, 'success');
+    closeModal();
+    pollAcrCard();
+  } catch (err) {
+    playErrorChime();
+    showToast(err.message, 'error');
+  }
+}
+
+function openBridgeGuide() {
+  showModal(`
+    <div class="space-y-4">
+      <div class="flex items-center gap-2 border-b border-graphite-800 pb-3">
+        <span class="text-2xl">🔌</span>
+        <div>
+          <div class="text-lg font-bold text-white">ACR1581U PC/SC Bridge Guide</div>
+          <div class="text-xs text-graphite-400">Connecting your desktop USB smart card reader to FoxyGift</div>
+        </div>
+      </div>
+      <div class="text-xs text-graphite-300 space-y-3 leading-relaxed">
+        <p>Because modern web browsers sandbox direct USB smartcard driver access for security, the <strong class="text-white">FoxyGift SmartCard Bridge</strong> provides a secure local connection on <code class="px-1.5 py-0.5 rounded bg-graphite-800 font-mono text-foxy-300">http://127.0.0.1:8989</code>.</p>
+        <div class="p-3 bg-graphite-950 rounded-xl border border-graphite-800 space-y-2">
+          <div class="font-semibold text-white">⚡ Quick Start on Windows:</div>
+          <ol class="list-decimal list-inside space-y-1 text-graphite-400">
+            <li>Ensure your <strong class="text-white">ACS ACR1581U</strong> reader is plugged into a USB port.</li>
+            <li>In the project folder, open <strong class="text-foxy-400">web/bridge/</strong>.</li>
+            <li>Double-click <strong class="text-emerald-400 font-mono">run_bridge.bat</strong>.</li>
+            <li>A black console window will open and confirm: <em class="text-graphite-300">"Server listening on http://127.0.0.1:8989"</em>.</li>
+            <li>Leave that window running while you pre-initialize cards!</li>
+          </ol>
+        </div>
+        <p class="text-graphite-400">The bridge automatically utilizes the contactless PICC interface (<code class="font-mono text-foxy-300">ACS ACR1581 1S Dual Reader PICC 0</code>) and standard PC/SC APDUs to write and hardware-lock cards.</p>
+      </div>
+      <div class="flex justify-between items-center pt-2">
+        <button onclick="checkAcrBridge(true); closeModal();" class="px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl text-xs font-bold transition-all">
+          🔄 Test Connection Now
+        </button>
+        <button onclick="closeModal()" class="px-4 py-2 border border-graphite-700 hover:bg-graphite-800 text-graphite-300 rounded-xl text-xs font-semibold">
+          Close
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+// ════════════════════════════════════════════════ PRE-INIT CARDS REGISTRY & LOG ════════════════
+function addPreinitLogEntry(cardId, chipType, status) {
+  const container = document.getElementById('preinitLog');
+  if (!container) return;
+  if (container.querySelector('.text-center')) {
+    container.innerHTML = '';
+  }
+  const isSuccess = status === 'SUCCESS';
+  const entry = document.createElement('div');
+  entry.className = `p-2.5 rounded-xl border text-xs flex items-center justify-between ${
+    isSuccess ? 'bg-emerald-950/40 border-emerald-800 text-emerald-200' : 'bg-red-950/40 border-red-800 text-red-200'
+  }`;
+  const time = new Date().toLocaleTimeString('en-GB');
+  entry.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span>${isSuccess ? '✅' : '❌'}</span>
+      <span class="font-bold font-mono text-white">${formatDecimalCard(String(cardId))}</span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-graphite-800 font-mono text-graphite-300">${chipType}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-graphite-400">${time}</span>
+      <span class="text-[11px] font-bold ${isSuccess ? 'text-emerald-400' : 'text-red-400'}">${status}</span>
+    </div>
+  `;
+  container.prepend(entry);
+}
+
+function clearPreinitLog() {
+  const container = document.getElementById('preinitLog');
+  if (container) {
+    container.innerHTML = '<div class="text-graphite-500 py-6 text-center">Session log will appear here as cards are processed…</div>';
+  }
+}
+
+async function renderPreinitCardTable() {
+  const tbody = document.getElementById('preinitCardTable');
+  if (!tbody) return;
+  try {
+    const cards = await getAll('provisionedCards');
+    if (!cards || cards.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-6 text-center text-graphite-500">No pre-initialized cards yet. Tap cards on ACR1581U to pre-initialize.</td></tr>';
+      return;
+    }
+    cards.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    tbody.innerHTML = cards.map((c, idx) => `
+      <tr class="border-b border-graphite-800/50 hover:bg-graphite-900/40 transition-colors" data-idx="${idx}">
+        <td class="px-3 py-2.5 font-mono font-bold text-foxy-400 select-all">${formatDecimalCard(String(c.cardNumberDec || ''))}</td>
+        <td class="px-3 py-2.5 font-mono text-graphite-300"><span class="px-2 py-0.5 rounded bg-graphite-800 text-xs">${c.chipType || 'NTAG'}</span></td>
+        <td class="px-3 py-2.5 text-white font-medium">${c.networkName || ('Merchant #' + c.merchantId)}</td>
+        <td class="px-3 py-2.5 text-graphite-400 font-mono text-xs">${formatTimestamp(c.timestamp)}</td>
+        <td class="px-3 py-2.5">
+          <span class="${c.status === 'REINIT' ? 'text-amber-400 bg-amber-900/30 border border-amber-700/40' : 'badge-success'} px-2 py-0.5 rounded-full text-[11px] font-semibold flex items-center gap-1 w-fit">
+            <span>${c.status === 'REINIT' ? '♻️' : '🔒'}</span> ${c.status === 'REINIT' ? 'Re-Initialized' : 'PWD Locked'}
+          </span>
+        </td>
+        <td class="px-3 py-2.5">
+          <div class="flex items-center gap-1.5">
+            <button onclick="openReinitModal('${escapeHtml(c.cardNumberDec)}', ${c.merchantId}, '${escapeHtml(c.chipType || 'NTAG213')}', '${escapeHtml(c.networkName || '')}')" 
+              title="Re-Initialize this card (overwrite with fresh PRE_INIT state)"
+              class="px-2.5 py-1 rounded-lg bg-amber-900/40 hover:bg-amber-800/60 border border-amber-700/50 hover:border-amber-500 text-amber-300 hover:text-amber-100 text-[11px] font-semibold transition-all flex items-center gap-1">
+              ♻️ Re-Init
+            </button>
+            <button onclick="deletePreinitCard('${escapeHtml(c.cardNumberDec)}')" 
+              title="Remove from local registry (does NOT erase physical card)"
+              class="p-1.5 rounded-lg hover:bg-graphite-800 text-graphite-500 hover:text-red-400 transition-all" >
+              🗑
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    console.error('Failed to render preinit table:', e);
+  }
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Re-Init Modal state ───
+let reinitTargetCard   = null;
+let reinitReadCardData = null;  // data from /api/read-balance
+
+// Helper: format cents as currency string "12.50 EUR"
+function formatCurrency(cents, currency) {
+  if (!cents || cents <= 0) return '0.00 ' + (currency || '€');
+  return (cents / 100).toFixed(2) + ' ' + (currency || '€');
+}
+
+async function openReinitModal(cardNumberDec, merchantId, chipType, networkName) {
+  reinitTargetCard   = { cardNumberDec, merchantId, chipType, networkName };
+  reinitReadCardData = null;
+
+  // Reset to step 1
+  document.getElementById('reinitStep1').classList.remove('hidden');
+  document.getElementById('reinitStep2').classList.add('hidden');
+  document.getElementById('reinitModalSubtitle').textContent = 'Шаг 1 из 2 — Считать текущие данные карты';
+
+  // Fill merchant select
+  const sel = document.getElementById('reinitMerchantSel');
+  if (sel) {
+    const merchants = await getAll('merchants');
+    sel.innerHTML = merchants.map(m =>
+      `<option value="${m.id}" ${m.id === merchantId ? 'selected' : ''}>${m.networkName}</option>`
+    ).join('');
+  }
+  // Fill card info
+  const info = document.getElementById('reinitCardInfo');
+  if (info) info.textContent = formatDecimalCard(String(cardNumberDec))
+    + ' · ' + (networkName || 'Merchant #' + merchantId) + ' · ' + (chipType || 'NTAG213');
+
+  document.getElementById('reinitModal').classList.remove('hidden');
+  document.getElementById('reinitModal').classList.add('flex');
+}
+
+function closeReinitModal() {
+  document.getElementById('reinitModal').classList.add('hidden');
+  document.getElementById('reinitModal').classList.remove('flex');
+  // Reset both steps
+  document.getElementById('reinitStep1').classList.remove('hidden');
+  document.getElementById('reinitStep2').classList.add('hidden');
+  reinitTargetCard   = null;
+  reinitReadCardData = null;
+}
+
+function reinitGoBack() {
+  document.getElementById('reinitStep1').classList.remove('hidden');
+  document.getElementById('reinitStep2').classList.add('hidden');
+  document.getElementById('reinitModalSubtitle').textContent = 'Шаг 1 из 2 — Считать текущие данные карты';
+  reinitReadCardData = null;
+}
+
+// STEP 1: Read card balance from chip via bridge
+async function reinitReadCard() {
+  const sel = document.getElementById('reinitMerchantSel');
+  const merchantId = parseInt(sel?.value);
+  if (!merchantId) { showToast('Выберите торговца для аутентификации.', 'error'); return; }
+
+  const btn = document.getElementById('reinitReadBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Считываю…'; }
+
+  try {
+    const keys = await getAll('masterKeys');
+    const key  = keys.find(k => k.merchantId === merchantId);
+    const m    = await getById('merchants', merchantId);
+    if (!key) throw new Error(`Мастер-ключ для торговца "${m?.networkName || merchantId}" не найден.`);
+
+    const selReader = document.getElementById('acrReaderSelect')?.value || '';
+    const res = await fetch(ACR_BRIDGE_URL + '/api/read-balance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        masterKeyHex: key.secretHex,
+        merchantId:   String(merchantId),
+        terminalId:   m?.terminalId || 'TERM-001',
+        reader:       selReader,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!data.success) throw new Error(data.userHint || data.error || 'Не удалось считать карту');
+
+    reinitReadCardData = { ...data, merchantId, m };
+
+    // Update target merchant from actual card read
+    reinitTargetCard.merchantId = merchantId;
+
+    // ── Show Step 2 ──
+    const currency = m?.currency || 'EUR';
+    const balanceCents = data.balanceCents  || 0;
+    const nominalCents = data.nominalCents  || 0;
+    const hasBalance   = balanceCents > 0;
+
+    // Status badge
+    const statusColors = {
+      ACTIVE:    'text-green-400', PRE_INIT:  'text-blue-400',
+      EXHAUSTED: 'text-graphite-500', PROLONGED: 'text-purple-400',
+      UNKNOWN:   'text-graphite-400',
+    };
+    const statusLabel = data.isFoxyCard ? (data.statusLabel || 'UNKNOWN') : 'BLANK / NOT FOXY';
+    document.getElementById('reinitStatusBadge').className =
+      'text-sm font-bold ' + (data.isFoxyCard ? (statusColors[data.statusLabel] || 'text-graphite-400') : 'text-graphite-500');
+    document.getElementById('reinitStatusBadge').textContent = statusLabel;
+
+    document.getElementById('reinitNominalVal').textContent =
+      nominalCents > 0 ? formatCurrency(nominalCents, currency) : '—';
+
+    const balEl = document.getElementById('reinitBalanceVal');
+    balEl.textContent = formatCurrency(balanceCents, currency);
+    balEl.className   = 'text-lg font-black ' + (hasBalance ? 'text-red-400' : 'text-green-400');
+
+    // Expiry
+    const expiryEl = document.getElementById('reinitExpiryRow');
+    if (data.expiryEpoch && data.expiryEpoch > 0) {
+      const exp = new Date(data.expiryEpoch * 1000);
+      expiryEl.textContent = 'Срок: ' + exp.toLocaleDateString('ru-RU',
+        { day: '2-digit', month: 'long', year: 'numeric' });
+    } else { expiryEl.textContent = ''; }
+
+    // Balance block border color
+    document.getElementById('reinitBalanceBlock').className =
+      'rounded-xl border p-4 space-y-3 ' + (hasBalance ? 'border-red-700/60 bg-red-900/10' : 'border-green-700/40 bg-green-900/10');
+
+    // Show/hide balance warning
+    const warnEl = document.getElementById('reinitBalanceWarn');
+    warnEl.classList.toggle('hidden', !hasBalance);
+    warnEl.classList.toggle('flex', hasBalance);
+
+    // Show/hide balance confirm input
+    const amtRow = document.getElementById('reinitConfirmAmtRow');
+    amtRow.classList.toggle('hidden', !hasBalance);
+    if (hasBalance) {
+      const amtInput = document.getElementById('reinitConfirmAmtInput');
+      amtInput.value = '';
+      amtInput.placeholder = 'Например: ' + (balanceCents / 100).toFixed(2);
+      // Store expected value
+      amtInput.dataset.expected = (balanceCents / 100).toFixed(2);
+    }
+
+    // Show step 2
+    document.getElementById('reinitStep1').classList.add('hidden');
+    document.getElementById('reinitStep2').classList.remove('hidden');
+    document.getElementById('reinitModalSubtitle').textContent = 'Шаг 2 из 2 — Подтвердить перезапись';
+
+  } catch(err) {
+    showToast('❌ ' + err.message, 'error', 5000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '📡 Считать карту'; }
+  }
+}
+
+// STEP 2: Execute re-init after confirmation
+async function confirmReinit() {
+  if (!reinitTargetCard || !reinitReadCardData) return;
+
+  // Check if balance confirmation input required
+  const amtRow = document.getElementById('reinitConfirmAmtRow');
+  if (!amtRow.classList.contains('hidden')) {
+    const amtInput   = document.getElementById('reinitConfirmAmtInput');
+    const expected   = amtInput.dataset.expected;
+    const entered    = amtInput.value.trim().replace(',', '.');
+    if (entered !== expected) {
+      amtInput.classList.add('border-red-500');
+      showToast(`❌ Сумма не совпадает. Ожидается: ${expected}`, 'error', 4000);
+      return;
+    }
+    amtInput.classList.remove('border-red-500');
+  }
+
+  const merchantId = reinitReadCardData.merchantId;
+  const confirmBtn = document.getElementById('reinitConfirmBtn');
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.innerHTML = '⏳ Перезаписываю…'; }
+
+  try {
+    const [m, keys] = await Promise.all([
+      getById('merchants', merchantId),
+      getAll('masterKeys')
+    ]);
+    const key = keys.find(k => k.merchantId === merchantId);
+    if (!key) throw new Error(`Мастер-ключ для торговца "${m?.networkName || merchantId}" не найден.`);
+
+    const merchantIdHash = await computeMerchantIdHash(merchantId, key.secretHex);
+    const chipType  = reinitTargetCard.chipType || 'NTAG213';
+    const selReader = document.getElementById('acrReaderSelect')?.value || '';
+
+    // Auth key = key of the ORIGINAL merchant (who locked the card).
+    // May differ from the new merchant's key if re-assigning to another merchant.
+    const origMerchantId = reinitTargetCard.merchantId;  // from registry entry
+    const origKey = keys.find(k => k.merchantId === origMerchantId);
+    const origM   = origMerchantId !== merchantId ? await getById('merchants', origMerchantId) : m;
+
+    const payload = {
+      merchantId:       merchantId,
+      terminalId:       m?.terminalId || 'TERM-001',
+      merchantIdHash:   merchantIdHash,
+      masterKeyHex:     key.secretHex,
+      chipType:         chipType,
+      reader:           selReader,
+      forceReinit:      'true',
+      // Auth fields for unlocking the card if it was locked by a different merchant
+      authMasterKeyHex: origKey?.secretHex || key.secretHex,
+      authMerchantId:   String(origMerchantId),
+      authTerminalId:   origM?.terminalId || 'TERM-001',
+    };
+
+    const res = await fetch(ACR_BRIDGE_URL + '/api/preinit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || !result.success) throw new Error(result.userHint || result.error || 'Bridge re-init failed');
+
+    playSuccessChime();
+    const cardDec = result.cardNumberDec || reinitTargetCard.cardNumberDec;
+    await upsertProvisionedCard({
+      timestamp: new Date().toISOString(),
+      cardNumberDec: cardDec,
+      merchantId,
+      chipType: result.chipType || chipType,
+      status: 'REINIT',
+      networkName: m?.networkName,
+    });
+    await logAudit('CARD_REINIT', merchantId,
+      `Card ${formatDecimalCard(String(cardDec))} re-initialized via ACR1581U (${chipType}). Previous balance: ${formatCurrency(reinitReadCardData.balanceCents, m?.currency)}`);
+    addPreinitLogEntry(cardDec, chipType, 'RE-INIT SUCCESS');
+    showToast(`✅ Карта ${formatDecimalCard(String(cardDec))} успешно переинициализирована!`, 'success');
+    closeReinitModal();
+    renderPreinitCardTable();
+  } catch(err) {
+    playErrorChime();
+    showToast(`❌ Ошибка переинициализации: ${err.message}`, 'error', 6000);
+    addPreinitLogEntry(reinitTargetCard?.cardNumberDec || '?', reinitTargetCard?.chipType || '?', `RE-INIT FAIL: ${err.message}`);
+  } finally {
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '♻️ Перезаписать карту'; }
+  }
+}
+
+
+async function deletePreinitCard(cardNumberDec) {
+  if (!confirm(`Удалить запись карты ${formatDecimalCard(String(cardNumberDec))} из локального реестра?\n\nФизическая карта НЕ будет сброшена.`)) return;
+  try {
+    const cards = await getAll('provisionedCards');
+    const toDelete = cards.find(c => String(c.cardNumberDec) === String(cardNumberDec));
+    if (toDelete && toDelete.id != null) {
+      await new Promise((resolve, reject) => {
+        dbTx('provisionedCards', 'readwrite', store => {
+          const req = store.delete(toDelete.id);
+          req.onsuccess = resolve;
+          req.onerror   = () => reject(req.error);
+        });
+      });
+    }
+    showToast(`Запись карты ${formatDecimalCard(String(cardNumberDec))} удалена из реестра.`, 'info');
+    renderPreinitCardTable();
+  } catch(e) {
+    showToast('Ошибка удаления записи: ' + e.message, 'error');
+  }
+}
+
+async function exportPreInitCards() {
+  const cards = await getAll('provisionedCards');
+  if (!cards || cards.length === 0) {
+    showToast('No pre-initialized cards to export.', 'info');
+    return;
+  }
+  cards.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  let csv = 'Card Number (Decimal),Chip Model,Merchant,Timestamp,Security Status\n';
+  cards.forEach(c => {
+    csv += `"${c.cardNumberDec}","${c.chipType}","${(c.networkName || c.merchantId).toString().replace(/"/g, '""')}","${c.timestamp}","PWD Locked"\n`;
+  });
+  downloadFile('FoxyGift_Preinit_Cards_' + dateStr() + '.csv', 'text/csv', csv);
+  showToast(`Exported ${cards.length} pre-initialized cards to CSV.`, 'success');
+}
+
+async function toggleWebNfcPreInit() {
+  if (webNfcScanning) {
+    stopWebNfcPreInit();
+    return;
+  }
+
+  if (webNfcSimulatorActive) {
+    await simulateWebNfcScan();
+    return;
+  }
+
+  if (!('NDEFReader' in window)) {
+    showWebNfcHelpModal();
+    return;
+  }
+
+  await startWebNfcPreInit();
+}
+
+function showWebNfcHelpModal() {
+  const host = window.location.hostname || '127.0.0.1';
+  const port = window.location.port || '8989';
+  const targetIp = (host === 'localhost' || host === '127.0.0.1') ? '192.168.31.17' : host;
+  const localUrl = `http://${targetIp}:${port}/admin_provisioning_tool.html`;
+
+  showModal(`
+    <div class="space-y-4 text-left">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl shrink-0">📱</div>
+        <div>
+          <h3 class="text-base font-bold text-white">Активация Method B: Web NFC</h3>
+          <p class="text-xs text-graphite-400">Бесконтактное считывание через браузер</p>
+        </div>
+      </div>
+
+      <div class="p-3.5 bg-graphite-800/80 rounded-xl border border-graphite-700/80 text-xs text-graphite-300 space-y-2">
+        <p>
+          <strong class="text-white">Почему Web NFC не активен напрямую на этом ПК?</strong><br>
+          Стандарт W3C Web NFC API аппаратно реализован разработчиками Google исключительно в 
+          <span class="text-blue-400 font-semibold">Google Chrome для Android</span> на смартфонах и планшетах с встроенным модулем NFC.
+          В настольных браузерах под Windows / macOS прямой доступ к Web NFC не предоставляется сайтам.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+        <div class="p-3.5 rounded-xl bg-foxy-950/30 border border-foxy-800/40 space-y-2">
+          <div class="text-xs font-bold text-foxy-400 flex items-center gap-1.5">
+            <span>🦊</span> Вариант 1 (Основной для ПК):
+          </div>
+          <p class="text-xs text-graphite-400">
+            Используйте <strong class="text-white">Method A (USB-ридер ACR1581U)</strong>. Он уже подключен к ПК через локальный мост и обеспечивает максимальную скорость и аппаратную блокировку чипов.
+          </p>
+          <button onclick="closeModal();" class="w-full py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-lg font-bold text-xs transition-all shadow-lg shadow-foxy-900/30">
+            Перейти к ACR1581U
+          </button>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-800/40 space-y-2">
+          <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+            <span>🧪</span> Вариант 2 (Для проверки):
+          </div>
+          <p class="text-xs text-graphite-400">
+            Включить <strong class="text-white">Режим симулятора Web NFC</strong> прямо в этом окне браузера. Вы сможете проверить весь конвейер прошивки и логику Method B без телефона.
+          </p>
+          <button onclick="closeModal(); enableWebNfcSimulator();" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs transition-all shadow-lg shadow-emerald-900/30">
+            Включить симулятор Web NFC
+          </button>
+        </div>
+      </div>
+
+      <div class="p-3 bg-graphite-900/70 rounded-xl border border-graphite-800 flex items-center gap-3">
+        <div id="webNfcModalQr" class="bg-white p-1 rounded-lg shrink-0 w-[68px] h-[68px] flex items-center justify-center"></div>
+        <div class="text-xs text-graphite-300 space-y-1 overflow-hidden">
+          <div class="font-bold text-white flex items-center gap-1">
+            <span>📲</span> Вариант 3: Запуск на Android смартфоне
+          </div>
+          <p class="text-[11px] text-graphite-400">
+            Отсканируйте QR-код или откройте адрес в мобильном Chrome (в домашней Wi-Fi сети):
+          </p>
+          <div class="font-mono text-[11px] text-blue-400 select-all truncate bg-graphite-800 px-2 py-1 rounded border border-graphite-700">
+            ${localUrl}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button onclick="closeModal()" class="px-4 py-1.5 text-xs text-graphite-400 hover:text-white rounded-lg bg-graphite-800 hover:bg-graphite-700 transition-all font-semibold">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  `);
+
+  setTimeout(() => {
+    const qrContainer = document.getElementById('webNfcModalQr');
+    if (qrContainer && typeof QRCode !== 'undefined') {
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: localUrl,
+        width: 60,
+        height: 60,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }, 50);
+}
+
+function enableWebNfcSimulator() {
+  webNfcSimulatorActive = true;
+  const details = document.getElementById('webNfcDetails');
+  if (details) details.open = true;
+  checkNfcSupport();
+  generateRandomSimUid();
+  showToast('🧪 Симулятор Web NFC включен! Нажмите «Симулировать поднесение карты».', 'success');
+}
+
+function disableWebNfcSimulator() {
+  webNfcSimulatorActive = false;
+  const simPanel = document.getElementById('webNfcSimPanel');
+  if (simPanel) simPanel.classList.add('hidden');
+  checkNfcSupport();
+  showToast('Симулятор Web NFC отключен.', 'info');
+}
+
+function generateRandomSimUid() {
+  const input = document.getElementById('webNfcSimUid');
+  if (!input) return;
+  const bytes = [0x04]; // NXP Mifare/NTAG manufacturer byte
+  for (let i = 0; i < 6; i++) {
+    bytes.push(Math.floor(Math.random() * 256));
+  }
+  input.value = bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(':');
+}
+
+async function simulateWebNfcScan() {
+  const input = document.getElementById('webNfcSimUid');
+  let uid = input ? input.value.trim() : '';
+  if (!uid) {
+    generateRandomSimUid();
+    uid = input ? input.value.trim() : '04:A2:3B:01:23:45:67';
+  }
+  const cleanHex = uid.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  if (cleanHex.length < 8) {
+    showToast('Введите корректный HEX UID (например, 04:A2:3B:01:23:45:67)', 'error');
+    return;
+  }
+
+  await handleWebNfcCardRead(cleanHex);
+  generateRandomSimUid();
+}
+
+async function startWebNfcPreInit() {
+  if (!('NDEFReader' in window)) {
+    showWebNfcHelpModal();
+    return;
+  }
+
+  const merchantSelect = document.getElementById('preinitMerchantSelect');
+  const merchantId = merchantSelect ? merchantSelect.value : null;
+  if (!merchantId) {
+    showToast('Сначала выберите торговца в выпадающем списке!', 'warn');
+    return;
+  }
+
+  try {
+    webNfcAbortController = new AbortController();
+    const ndef = new NDEFReader();
+    await ndef.scan({ signal: webNfcAbortController.signal });
+
+    webNfcScanning = true;
+    checkNfcSupport();
+
+    showToast('📡 Web NFC сканирование запущено! Приложите карту к задней панели устройства.', 'info', 5000);
+
+    ndef.onreading = async (event) => {
+      const serial = event.serialNumber;
+      if (!serial) {
+        showToast('NFC метка считана, но UID не передан устройством.', 'warn');
+        return;
+      }
+      const cleanHex = serial.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+      await handleWebNfcCardRead(cleanHex, ndef);
+    };
+
+    ndef.onreadingerror = () => {
+      showToast('⚠️ Ошибка чтения NFC чипа. Попробуйте приложить карту ровнее.', 'error');
+    };
+
+  } catch (err) {
+    console.error('Web NFC scan error:', err);
+    webNfcScanning = false;
+    checkNfcSupport();
+    showToast('Не удалось запустить Web NFC: ' + (err.message || err), 'error');
+  }
+}
+
+function stopWebNfcPreInit() {
+  if (webNfcAbortController) {
+    try { webNfcAbortController.abort(); } catch (e) {}
+    webNfcAbortController = null;
+  }
+  webNfcScanning = false;
+  checkNfcSupport();
+  showToast('Web NFC сканирование остановлено.', 'info');
+}
+
+async function handleWebNfcCardRead(uidHex, ndefInstance = null) {
+  const merchantSelect = document.getElementById('preinitMerchantSelect');
+  const merchantId = merchantSelect ? merchantSelect.value : null;
+  if (!merchantId) {
+    showToast('Выберите торговца для привязки карты!', 'warn');
+    return;
+  }
+
+  const m = await getRecord('merchants', merchantId);
+  if (!m) {
+    showToast('Торговец не найден в локальной базе!', 'error');
+    return;
+  }
+
+  playCardDetectedChime();
+
+  // Convert UID to decimal card number
+  let cardDec = '';
+  try {
+    cardDec = BigInt('0x' + uidHex).toString(10);
+  } catch (e) {
+    cardDec = uidHex;
+  }
+
+  // If real Web NFC, attempt to write NDEF record
+  if (ndefInstance) {
+    try {
+      await ndefInstance.write({
+        records: [
+          { recordType: 'text', data: `FOXY:${merchantId}:${cardDec}` }
+        ]
+      }, { overwrite: true });
+    } catch (wErr) {
+      console.warn('Web NFC NDEF write notice:', wErr);
+    }
+  }
+
+  const chipType = 'NTAG (Web NFC)';
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    cardNumberDec: cardDec,
+    merchantId: merchantId,
+    chipType: chipType,
+    status: 'SUCCESS',
+    networkName: m.networkName || merchantId,
+    method: 'WEB_NFC'
+  };
+
+  await upsertProvisionedCard(logEntry);
+
+  preinitSessionCount++;
+  const countBadge = document.getElementById('preinitCountBadge');
+  if (countBadge) countBadge.textContent = preinitSessionCount;
+
+  addPreinitLogEntry(cardDec, chipType, 'SUCCESS (Web NFC)');
+  await logAudit('CARD_PREINIT_WEBNFC', merchantId, `Card ${formatDecimalCard(cardDec)} recorded via Web NFC (${m.networkName || merchantId})`);
+
+  playSuccessChime();
+  showToast(`✅ Карта ${formatDecimalCard(cardDec)} успешно инициализирована через Web NFC!`, 'success');
+  renderPreinitCardTable();
+}
+
+function cancelNfc() {
+  if (webNfcScanning) stopWebNfcPreInit();
+}
+
+// ════════════════════════════════════════════════ AUDIT LOG ════════════════
+let _allAuditEvents = [];
+
+async function renderAuditLog() {
+  _allAuditEvents = await getAll('auditLog');
+  renderFilteredAudit(_allAuditEvents);
+}
+
+function filterAuditLog() {
+  const q = document.getElementById('auditSearch').value.toLowerCase();
+  renderFilteredAudit(_allAuditEvents.filter(a =>
+    a.action.toLowerCase().includes(q) || (a.details||'').toLowerCase().includes(q)
+  ));
+}
+
+function renderFilteredAudit(events) {
+  const tbody = document.getElementById('auditLogTable');
+  if (events.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-graphite-500">No audit events found.</td></tr>'; return;
+  }
+  tbody.innerHTML = events.slice().reverse().map(a => `
+    <tr class="border-b border-graphite-800/50">
+      <td class="px-4 py-3 text-xs text-graphite-400 font-mono">${formatTimestamp(a.timestamp)}</td>
+      <td class="px-4 py-3"><span class="font-semibold text-xs uppercase px-2 py-0.5 rounded-full badge-info">${a.action}</span></td>
+      <td class="px-4 py-3 text-graphite-400 text-xs">${a.merchantId || '—'}</td>
+      <td class="px-4 py-3 text-graphite-300 text-xs">${a.details || ''}</td>
+    </tr>`).join('');
+}
+
+async function exportAuditLog() {
+  const events = await getAll('auditLog');
+  const csv = ['Timestamp,Action,MerchantID,Details',
+    ...events.map(a => `"${a.timestamp}","${a.action}","${a.merchantId||''}","${(a.details||'').replace(/"/g,'""')}"`)
+  ].join('\n');
+  downloadFile('FoxyGift_AuditLog_' + dateStr() + '.csv', 'text/csv', csv);
+}
+
+// ════════════════════════════════════════════════ BACKUP ════════════════
+async function exportBackup() {
+  const [merchants, masterKeys, provisionedCards, auditLog, pinConfig] = await Promise.all([
+    getAll('merchants'), getAll('masterKeys'), getAll('provisionedCards'), getAll('auditLog'), getAll('pinConfig')
+  ]);
+  const backup = {
+    appName: 'FoxyGiftVendorTool',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: { merchants, masterKeys, provisionedCards, auditLog, pinConfig }
+  };
+  downloadFile(`FoxyGift_Vendor_Backup_${dateStr()}.json`, 'application/json', JSON.stringify(backup, null, 2));
+  showToast('Backup exported successfully.', 'success');
+  await logAudit('BACKUP_EXPORT', null, 'Full database backup exported');
+}
+
+async function importBackup() {
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.accept= '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text   = await file.text();
+      const backup = JSON.parse(text);
+      if (backup.appName !== 'FoxyGiftVendorTool') { showToast('Invalid backup file.', 'error'); return; }
+      showModal(`
+        <div class="space-y-4">
+          <div class="text-lg font-bold text-foxy-400">⚠️ Import Backup</div>
+          <div class="text-sm text-graphite-300">Import backup from <strong class="text-white">${file.name}</strong>?</div>
+          <div class="text-xs text-graphite-500">This will <strong class="text-red-400">overwrite</strong> all existing data with the backup data. Exported: ${backup.exportedAt}</div>
+          <div class="flex gap-3 justify-end">
+            <button onclick="closeModal()" class="px-4 py-2 border border-graphite-700 text-graphite-400 rounded-xl text-sm">Cancel</button>
+            <button onclick="confirmImportBackup(${JSON.stringify(JSON.stringify(backup))})" class="hidden"></button>
+            <button onclick="window._pendingBackup = ${JSON.stringify(JSON.stringify(backup))}; confirmImportBackup(); closeModal();" class="px-4 py-2 bg-foxy-700 hover:bg-foxy-600 text-white rounded-xl text-sm font-bold">Import</button>
+          </div>
+        </div>`);
+      window._pendingBackupData = backup;
+    } catch(err) { showToast('Failed to parse backup: ' + err.message, 'error'); }
+  };
+  input.click();
+}
+
+async function confirmImportBackup() {
+  const backup = window._pendingBackupData;
+  if (!backup) return;
+  const stores = ['merchants','masterKeys','provisionedCards','auditLog','pinConfig'];
+  for (const storeName of stores) {
+    const records = backup.data[storeName] || [];
+    for (const record of records) {
+      try { await putRecord(storeName, record); } catch(e) { console.warn('Import error:', e); }
+    }
+  }
+  showToast('Backup imported successfully! Refreshing…', 'success');
+  await logAudit('BACKUP_IMPORT', null, 'Database restored from backup file');
+  setTimeout(() => location.reload(), 1500);
+}
+
+// ════════════════════════════════════════════════ HELPERS ════════════════
+function downloadFile(filename, mimeType, content) {
+  const blob = new Blob([content], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function dateStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ════════════════════════════════════════════════ INIT ════════════════
+async function init() {
+  try {
+    db = await openDatabase();
+    document.getElementById('dbStatusBadge').className = 'px-3 py-1 rounded-full text-xs font-semibold badge-success';
+    document.getElementById('dbStatusBadge').textContent = 'DB Ready';
+    await checkAcrBridge();
+    await refreshDashboard();
+    checkNfcSupport();
+
+    // First launch check
+    const merchants = await getAll('merchants');
+    if (merchants.length === 0) {
+      showModal(`
+        <div class="space-y-4 text-center">
+          <div class="text-5xl">🦊</div>
+          <div class="text-2xl font-black text-white">Welcome to FoxyGift</div>
+          <div class="text-sm text-graphite-300">Vendor Provisioning Tool initialized successfully.</div>
+          <div class="text-xs text-foxy-400 px-4 py-3 bg-foxy-900/30 rounded-xl border border-foxy-800">FoxyGift Vendor DB Initialized</div>
+          <div class="flex gap-3 justify-center pt-2">
+            <button onclick="closeModal(); showTab('merchants'); openMerchantForm(null);" class="px-5 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm">🏪 Add First Merchant</button>
+            <button onclick="importBackup(); closeModal();" class="px-5 py-2 border border-graphite-700 text-graphite-400 hover:text-white rounded-xl font-semibold text-sm">📂 Restore from Backup</button>
+          </div>
+        </div>`);
+    }
+  } catch(err) {
+    document.getElementById('dbStatusBadge').className = 'px-3 py-1 rounded-full text-xs font-semibold badge-error';
+    document.getElementById('dbStatusBadge').textContent = 'DB Error';
+    showToast('Database initialization failed: ' + err.message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

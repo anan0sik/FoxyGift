@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FoxyGift POS</string>
+    <string name="nfc_required">NFC is required for this application.</string>
+    <string name="pin_enter">Enter PIN</string>
+    <string name="card_issued">Gift card issued successfully</string>
+    <string name="card_redeemed">Card redeemed</string>
+    <string name="insufficient_balance">Insufficient card balance</string>
+    <string name="card_expired">Card has expired</string>
+    <string name="card_exhausted">Card balance is zero</string>
+    <string name="invalid_card">Invalid or unrecognized card</string>
+    <string name="hmac_failed">Card signature verification failed — possible clone detected</string>
+    <string name="wrong_merchant">Card not registered with this merchant network</string>
+    <string name="do_not_remove">DO NOT REMOVE THE CARD</string>
+</resources>
