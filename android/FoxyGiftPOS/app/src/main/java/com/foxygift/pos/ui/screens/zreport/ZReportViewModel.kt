@@ -52,15 +52,16 @@ class ZReportViewModel @Inject constructor(
     private val telegramAlarmClient: TelegramAlarmClient,
 ) : ViewModel() {
 
-    private val shiftId = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     private val _statusFlow = MutableStateFlow(
-        ZReportActionStatus(isShiftClosed = provisionRepo.isShiftClosedToday(shiftId))
+        ZReportActionStatus()
     )
 
     val uiState: StateFlow<ZReportUiState> = combine(
-        transactionDao.observeTransactionsForShift(shiftId),
+        transactionDao.observeAllTransactions(),
         _statusFlow,
     ) { txList, status ->
+        val currentShiftId = provisionRepo.getCurrentShiftId()
+        val currentShiftNum = provisionRepo.getCurrentShiftNumber()
         var iCount = 0
         var iCents = 0L
         var rCount = 0
@@ -84,7 +85,7 @@ class ZReportViewModel @Inject constructor(
         val liability = maxOf(0L, iCents - rCents)
 
         ZReportUiState(
-            shiftDate        = shiftId,
+            shiftDate        = "$currentShiftId (#$currentShiftNum)",
             issueCount       = iCount,
             issueTotalCents  = iCents,
             redeemCount      = rCount,
@@ -96,7 +97,7 @@ class ZReportViewModel @Inject constructor(
             isExporting      = status.isExporting,
             isSendingTg      = status.isSendingTg,
             isClosingShift   = status.isClosingShift,
-            isShiftClosed    = status.isShiftClosed,
+            isShiftClosed    = false,
             feedbackMessage  = status.feedbackMessage,
             hasTelegram      = telegramAlarmClient.isConfigured(),
         )
@@ -104,9 +105,9 @@ class ZReportViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = ZReportUiState(
-            shiftDate     = shiftId,
+            shiftDate     = provisionRepo.getCurrentShiftId(),
             currency      = provisionRepo.getCurrency().ifBlank { "EUR" },
-            isShiftClosed = provisionRepo.isShiftClosedToday(shiftId),
+            isShiftClosed = false,
             hasTelegram   = telegramAlarmClient.isConfigured(),
         )
     )
@@ -137,6 +138,8 @@ class ZReportViewModel @Inject constructor(
 
         viewModelScope.launch {
             val state = uiState.value
+            val currentShiftId = provisionRepo.getCurrentShiftId()
+            val currentShiftNum = provisionRepo.getCurrentShiftNumber()
             val terminalId = provisionRepo.getTerminalId().ifBlank { "TERMINAL_001" }
             val locationName = provisionRepo.getLocationName().ifBlank { "FoxyGift POS" }
 
@@ -146,7 +149,7 @@ class ZReportViewModel @Inject constructor(
             val tgRes = telegramAlarmClient.sendZReportSummary(
                 terminalId     = terminalId,
                 locationName   = locationName,
-                shiftDate      = state.shiftDate,
+                shiftDate      = "$currentShiftId (Смена #$currentShiftNum)",
                 issued         = "$iFormatted (${state.issueCount} cards)",
                 redeemed       = "$rFormatted (${state.redeemCount} tx)",
                 txCount        = state.totalTxCount,
@@ -154,12 +157,12 @@ class ZReportViewModel @Inject constructor(
             )
 
             // Also forward CSV document to Telegram for the dashboard
-            val csvFile = runCatching { transactionExporter.generateCsvFile(state.shiftDate) }.getOrNull()
+            val csvFile = runCatching { transactionExporter.generateCsvFile(shiftId = currentShiftId) }.getOrNull()
             var docSent = false
             if (csvFile != null && csvFile.exists() && tgRes.isSuccess) {
                 val docRes = telegramAlarmClient.sendDocument(
                     file    = csvFile,
-                    caption = "📄 FoxyGift — Выгрузка транзакций (${state.shiftDate}) для дашборда"
+                    caption = "📄 FoxyGift — Выгрузка транзакций $currentShiftId (Смена #$currentShiftNum) для дашборда"
                 )
                 docSent = docRes.isSuccess
             }
@@ -184,36 +187,35 @@ class ZReportViewModel @Inject constructor(
 
         viewModelScope.launch {
             val state = uiState.value
+            val currentShiftId = provisionRepo.getCurrentShiftId()
+            val currentShiftNum = provisionRepo.getCurrentShiftNumber()
             val terminalId = provisionRepo.getTerminalId().ifBlank { "TERMINAL_001" }
             val locationName = provisionRepo.getLocationName().ifBlank { "FoxyGift POS" }
 
             val iFormatted = "%.2f %s".format(Locale.US, state.issueTotalCents / 100.0, state.currency)
             val rFormatted = "%.2f %s".format(Locale.US, state.redeemTotalCents / 100.0, state.currency)
 
-            // 1. Mark shift as closed
-            provisionRepo.markShiftClosedToday(shiftId)
+            // 1. Generate CSV export with all transactions for the current shift
+            val csvFile = runCatching { transactionExporter.generateCsvFile(shiftId = currentShiftId) }.getOrNull()
 
-            // 2. Generate CSV export with all transactions for the dashboard
-            val csvFile = runCatching { transactionExporter.generateCsvFile(state.shiftDate) }.getOrNull()
-
-            // 3. Dispatch Z-Report summary text to Telegram
+            // 2. Dispatch Z-Report summary text to Telegram
             val tgRes = telegramAlarmClient.sendZReportSummary(
                 terminalId     = terminalId,
                 locationName   = locationName,
-                shiftDate      = state.shiftDate,
+                shiftDate      = "$currentShiftId (Смена #$currentShiftNum)",
                 issued         = "$iFormatted (${state.issueCount} cards)",
                 redeemed       = "$rFormatted (${state.redeemCount} tx)",
                 txCount        = state.totalTxCount,
                 isClosingShift = true,
             )
 
-            // 4. Send transactions CSV document to Telegram for further import into client analytics dashboard
+            // 3. Send transactions CSV document to Telegram for further import into client analytics dashboard
             var csvSentToTg = false
             var tgDocError: String? = null
             if (csvFile != null && csvFile.exists() && telegramAlarmClient.isConfigured()) {
                 val docRes = telegramAlarmClient.sendDocument(
                     file    = csvFile,
-                    caption = "📄 FoxyGift — Транзакции смены ${state.shiftDate} (${state.totalTxCount} операций) для импорта в клиентский дашборд",
+                    caption = "📄 FoxyGift — Транзакции $currentShiftId (Смена #$currentShiftNum, ${state.totalTxCount} операций) для импорта в клиентский дашборд",
                 )
                 csvSentToTg = docRes.isSuccess
                 if (docRes.isFailure) {
@@ -221,25 +223,32 @@ class ZReportViewModel @Inject constructor(
                 }
             }
 
-            // 5. Open Android share sheet so operator can also email/save the CSV file
+            // 4. Open Android share sheet so operator can also email/save the CSV file
             if (csvFile != null && csvFile.exists()) {
                 runCatching { transactionExporter.shareExistingFile(csvFile) }
             }
 
+            // 5. Clear daily turnover transactions on the terminal
+            transactionDao.clearAllTransactions()
+
+            // 6. Mark shift closed and advance to next shift number
+            provisionRepo.markShiftClosedToday(currentShiftId)
+            val nextShiftNum = provisionRepo.advanceShift()
+
             val feedback = when {
                 tgRes.isSuccess && csvSentToTg ->
-                    "Смена успешно закрыта. Z-отчет и файл транзакций (CSV) отправлены в Telegram!"
+                    "Смена #$currentShiftNum успешно закрыта! Дневной оборот очищен. Готов к смене #$nextShiftNum."
                 tgRes.isSuccess && tgDocError != null ->
-                    "Смена закрыта. Z-отчет отправлен, но ошибка CSV файла в Telegram: $tgDocError"
+                    "Смена #$currentShiftNum закрыта. Z-отчет отправлен, ошибка CSV: $tgDocError. Оборот очищен."
                 tgRes.isSuccess ->
-                    "Смена успешно закрыта. Z-отчет отправлен в Telegram."
+                    "Смена #$currentShiftNum закрыта! Z-отчет отправлен. Оборот очищен."
                 else ->
-                    "Смена закрыта. Ошибка Telegram: ${tgRes.exceptionOrNull()?.localizedMessage ?: tgRes.exceptionOrNull()?.message}"
+                    "Смена #$currentShiftNum закрыта. Ошибка Telegram: ${tgRes.exceptionOrNull()?.localizedMessage ?: tgRes.exceptionOrNull()?.message}. Оборот очищен."
             }
 
             _statusFlow.value = _statusFlow.value.copy(
                 isClosingShift  = false,
-                isShiftClosed   = true,
+                isShiftClosed   = false,
                 feedbackMessage = feedback,
             )
         }

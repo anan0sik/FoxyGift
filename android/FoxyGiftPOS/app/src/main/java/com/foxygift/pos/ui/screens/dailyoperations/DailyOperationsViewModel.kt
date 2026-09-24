@@ -46,12 +46,14 @@ class DailyOperationsViewModel @Inject constructor(
     private val _exportError = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<DailyOperationsUiState> = combine(
-        transactionDao.observeTransactionsForShift(shiftId),
+        transactionDao.observeAllTransactions(),
         _selectedFilter,
         _isExporting,
         _exportSuccessCount,
         _exportError,
     ) { txList, filter, exporting, successCount, error ->
+        val currentShiftId = provisionRepo.getCurrentShiftId()
+        val currentShiftNum = provisionRepo.getCurrentShiftNumber()
         val filtered = when (filter) {
             "ISSUE"   -> txList.filter { it.operationType == "ISSUE" }
             "REDEEM"  -> txList.filter { it.operationType.startsWith("REDEEM") }
@@ -77,7 +79,7 @@ class DailyOperationsViewModel @Inject constructor(
             issueTotalCents = issueSum,
             redeemTotalCents = redeemSum,
             currency = provisionRepo.getCurrency().ifBlank { "EUR" },
-            shiftDate = shiftId,
+            shiftDate = "$currentShiftId (#$currentShiftNum)",
             isExporting = exporting,
             exportSuccessCount = successCount,
             exportError = error,
@@ -87,7 +89,7 @@ class DailyOperationsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DailyOperationsUiState(
             currency = provisionRepo.getCurrency().ifBlank { "EUR" },
-            shiftDate = shiftId,
+            shiftDate = provisionRepo.getCurrentShiftId(),
         )
     )
 

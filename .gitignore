@@ -68,3 +68,8 @@ java_pid*.hprof
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# User test data and import folders
+Orders/
+*.csv
+

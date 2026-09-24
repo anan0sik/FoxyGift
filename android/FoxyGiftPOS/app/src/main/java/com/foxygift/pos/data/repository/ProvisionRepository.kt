@@ -133,11 +133,40 @@ class ProvisionRepository @Inject constructor(
             .apply()
     }
 
-    fun isShiftClosedToday(todayIso: String): Boolean =
-        prefs.getString("shift_closed_date", "") == todayIso
+    fun getCurrentShiftNumber(): Int {
+        val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        val savedDate = prefs.getString("current_shift_date", "") ?: ""
+        if (savedDate != today) {
+            prefs.edit()
+                .putString("current_shift_date", today)
+                .putInt("current_shift_number", 1)
+                .apply()
+            return 1
+        }
+        return prefs.getInt("current_shift_number", 1).coerceAtLeast(1)
+    }
 
-    fun markShiftClosedToday(todayIso: String) {
-        prefs.edit().putString("shift_closed_date", todayIso).apply()
+    fun getCurrentShiftId(): String {
+        val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        val num = getCurrentShiftNumber()
+        return "${today}_$num"
+    }
+
+    fun advanceShift(): Int {
+        val next = getCurrentShiftNumber() + 1
+        val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        prefs.edit()
+            .putString("current_shift_date", today)
+            .putInt("current_shift_number", next)
+            .apply()
+        return next
+    }
+
+    fun isShiftClosedToday(shiftId: String): Boolean =
+        prefs.getBoolean("shift_closed_$shiftId", false)
+
+    fun markShiftClosedToday(shiftId: String) {
+        prefs.edit().putBoolean("shift_closed_$shiftId", true).apply()
     }
 
     /** Full reset — used when re-provisioning the terminal. */

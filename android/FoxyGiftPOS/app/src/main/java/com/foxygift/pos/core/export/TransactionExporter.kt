@@ -24,16 +24,31 @@ class TransactionExporter @Inject constructor(
     /**
      * Generates a standard CSV file with all transactions matching the FoxyGift analytics dashboard schema.
      */
-    suspend fun generateCsvFile(customDate: String? = null): File = withContext(Dispatchers.IO) {
-        val transactions = transactionDao.getAllTransactionsList()
-        val today = customDate ?: LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    suspend fun generateCsvFile(
+        customDate: String? = null,
+        shiftId: String? = null,
+    ): File = withContext(Dispatchers.IO) {
+        val targetShift = shiftId ?: provisionRepo.getCurrentShiftId()
+        val transactions = if (shiftId != null) {
+            val list = transactionDao.getTransactionsForShift(targetShift)
+            if (list.isNotEmpty()) list else transactionDao.getAllTransactionsList()
+        } else {
+            transactionDao.getAllTransactionsList()
+        }
+
+        val now = java.time.LocalDateTime.now()
+        val datePart = customDate ?: now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"))
+        val terminalId = provisionRepo.getTerminalId().ifBlank { "POS" }.replace(" ", "_")
+        val shiftNum = provisionRepo.getCurrentShiftNumber()
 
         val exportDir = File(context.cacheDir, "exports")
         if (!exportDir.exists()) {
             exportDir.mkdirs()
         }
 
-        val csvFile = File(exportDir, "Transactions_${today}.csv")
+        val filename = "Transactions_${terminalId}_${datePart}_${timePart}_shift${shiftNum}.csv"
+        val csvFile = File(exportDir, filename)
 
         csvFile.bufferedWriter(Charsets.UTF_8).use { writer ->
             // CSV header matching FoxyGift client analytics dashboard schema

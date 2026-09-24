@@ -91,9 +91,24 @@
         <span id="dbTxCount">0</span> transactions · <span id="dbCardCount">0</span> cards
       </div>
       <span id="dbStatusBadge" class="px-3 py-1 rounded-full text-xs font-semibold badge-warn">DB Init…</span>
+      <!-- Language Selector -->
+      <div class="relative">
+        <button id="langMenuBtn" onclick="toggleLangMenu(event)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-graphite-800 hover:bg-graphite-700 border border-graphite-700 text-xs font-semibold text-white transition-all select-none">
+          <span id="currentLangFlag">🇬🇧</span>
+          <span id="currentLangCode">EN</span>
+          <span class="text-graphite-400 text-[9px]">▼</span>
+        </button>
+        <div id="langDropdown" class="hidden absolute right-0 mt-1.5 w-36 bg-graphite-900 border border-graphite-700 rounded-xl shadow-2xl py-1 z-50">
+          <button onclick="setDashboardLanguage('en')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-graphite-800 text-graphite-200 hover:text-white flex items-center gap-2">🇬🇧 English</button>
+          <button onclick="setDashboardLanguage('ru')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-graphite-800 text-graphite-200 hover:text-white flex items-center gap-2">🇷🇺 Русский</button>
+          <button onclick="setDashboardLanguage('lv')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-graphite-800 text-graphite-200 hover:text-white flex items-center gap-2">🇱🇻 Latviešu</button>
+          <button onclick="setDashboardLanguage('et')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-graphite-800 text-graphite-200 hover:text-white flex items-center gap-2">🇪🇪 Eesti</button>
+          <button onclick="setDashboardLanguage('lt')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-graphite-800 text-graphite-200 hover:text-white flex items-center gap-2">🇱🇹 Lietuvių</button>
+        </div>
+      </div>
       <button onclick="syncFromTelegram()" id="btnHeaderTgSync" title="Sync Reports from Telegram" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-950/60 hover:bg-blue-900 border border-blue-700/50 text-blue-300 hover:text-white text-xs font-semibold transition-all">
         <span>✈️</span>
-        <span class="hidden sm:inline">Sync Telegram</span>
+        <span id="headerSyncText" class="hidden sm:inline">Sync Telegram</span>
       </button>
       <button onclick="exportBackup()" title="Export Backup" class="p-2 rounded-lg hover:bg-graphite-800 text-graphite-400 hover:text-foxy-400 transition-all">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -126,39 +141,39 @@
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xl">💳</span>
-          <div class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Merchant Liability</div>
+          <div id="lblKpiLiability" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Merchant Liability</div>
         </div>
         <div id="kpiLiability" class="text-3xl font-black text-white">—</div>
-        <div class="text-xs text-graphite-500 mt-1">Active card balances</div>
+        <div id="lblKpiLiabilitySub" class="text-xs text-graphite-500 mt-1">Active card balances</div>
       </div>
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xl">💰</span>
-          <div class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Breakage Revenue</div>
+          <div id="lblKpiBreakage" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Breakage Revenue</div>
         </div>
         <div id="kpiBreakage" class="text-3xl font-black text-emerald-400">—</div>
-        <div class="text-xs text-graphite-500 mt-1">Expired unspent balances</div>
+        <div id="lblKpiBreakageSub" class="text-xs text-graphite-500 mt-1">Expired unspent balances</div>
       </div>
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xl">⚠️</span>
-          <div class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">At-Risk (30d)</div>
+          <div id="lblKpiAtRisk" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">At-Risk (30d)</div>
         </div>
         <div id="kpiAtRisk" class="text-3xl font-black text-foxy-400">—</div>
-        <div class="text-xs text-graphite-500 mt-1">Expiring within 30 days</div>
+        <div id="lblKpiAtRiskSub" class="text-xs text-graphite-500 mt-1">Expiring within 30 days</div>
       </div>
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xl">🔄</span>
-          <div class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Prolongations</div>
+          <div id="lblKpiProlong" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Prolongations</div>
         </div>
         <div id="kpiProlongCount" class="text-3xl font-black text-purple-400">—</div>
-        <div id="kpiProlongValue" class="text-xs text-graphite-500 mt-1">Total value prolonged</div>
+        <div id="lblKpiProlongSub" class="text-xs text-graphite-500 mt-1">Total value prolonged</div>
       </div>
       <div class="kpi-card glass rounded-2xl p-5 cursor-default">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xl">📊</span>
-          <div class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Card Inventory</div>
+          <div id="lblKpiInventoryTitle" class="text-xs text-graphite-400 font-semibold uppercase tracking-wider leading-tight">Card Inventory</div>
         </div>
         <div class="flex flex-wrap gap-1 mt-1" id="kpiInventory">
           <span class="text-xs px-2 py-0.5 rounded-full badge-info">— issued</span>
@@ -172,11 +187,11 @@
     <!-- Mini Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="glass rounded-2xl p-5">
-        <div class="font-semibold text-white mb-3 text-sm">Activations vs Redemptions (Last 30 days)</div>
+        <div id="lblOverviewChartTitle" class="font-semibold text-white mb-3 text-sm">Activations vs Redemptions (Last 30 days)</div>
         <canvas id="overviewChart" height="120"></canvas>
       </div>
       <div class="glass rounded-2xl p-5">
-        <div class="font-semibold text-white mb-3 text-sm">Card Status Distribution</div>
+        <div id="lblDonutChartTitle" class="font-semibold text-white mb-3 text-sm">Card Status Distribution</div>
         <canvas id="donutChart" height="120"></canvas>
       </div>
     </div>
@@ -184,8 +199,8 @@
     <!-- Recent Transactions -->
     <div class="glass rounded-2xl p-5">
       <div class="flex items-center justify-between mb-4">
-        <div class="font-bold text-white">Recent Transactions</div>
-        <button onclick="showTab('cards')" class="text-xs text-foxy-400 hover:text-foxy-300 font-semibold">View all →</button>
+        <div id="lblRecentTxTitle" class="font-bold text-white">Recent Transactions</div>
+        <button onclick="showTab('cards')" id="lblViewAllRecent" class="text-xs text-foxy-400 hover:text-foxy-300 font-semibold">View all →</button>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
@@ -239,7 +254,7 @@
 
     <div class="glass rounded-2xl overflow-hidden">
       <div class="flex items-center justify-between p-4 border-b border-graphite-800">
-        <div class="text-sm font-semibold text-white">Card Registry <span id="cardCountLabel" class="text-graphite-500 font-normal text-xs ml-2">Loading…</span></div>
+        <div class="text-sm font-semibold text-white"><span id="lblCardRegistryTitle">Card Registry</span> <span id="cardCountLabel" class="text-graphite-500 font-normal text-xs ml-2">Loading…</span></div>
         <div class="flex gap-2">
           <button onclick="exportCardsCSV()" class="px-3 py-1.5 text-xs border border-graphite-700 hover:border-foxy-600 text-graphite-400 hover:text-foxy-400 rounded-xl transition-all">CSV</button>
           <button onclick="exportCardsXLSX()" class="px-3 py-1.5 text-xs border border-graphite-700 hover:border-foxy-600 text-graphite-400 hover:text-foxy-400 rounded-xl transition-all">XLSX</button>
@@ -328,17 +343,17 @@
           </div>
           <div>
             <div class="font-bold text-white text-base flex items-center gap-2">
-              Telegram Bot Cloud Sync
+              <span id="lblTgSyncTitle">Telegram Bot Cloud Sync</span>
               <span id="tgBotBadge" class="text-xs px-2 py-0.5 rounded-full badge-warn">Not Configured</span>
             </div>
-            <div class="text-xs text-graphite-400">Автоматическая загрузка CSV-отчетов смены из Telegram-канала в локальную базу данных</div>
+            <div id="lblTgSyncSub" class="text-xs text-graphite-400">Автоматическая загрузка CSV-отчетов смены из Telegram-канала в локальную базу данных</div>
           </div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <button onclick="testTelegramBot(true)" class="px-3 py-1.5 border border-graphite-700 hover:border-graphite-600 text-graphite-300 hover:text-white rounded-xl text-xs font-semibold transition-all">
+          <button id="btnTgTest" onclick="testTelegramBot(true)" class="px-3 py-1.5 border border-graphite-700 hover:border-graphite-600 text-graphite-300 hover:text-white rounded-xl text-xs font-semibold transition-all">
             🔍 Test Bot
           </button>
-          <button onclick="resetTelegramOffset()" title="Сбросить указатель для повторного сканирования всех доступных отчетов" class="px-3 py-1.5 border border-graphite-700 hover:border-graphite-600 text-graphite-300 hover:text-white rounded-xl text-xs font-semibold transition-all">
+          <button id="btnTgReset" onclick="resetTelegramOffset()" title="Сбросить указатель для повторного сканирования всех доступных отчетов" class="px-3 py-1.5 border border-graphite-700 hover:border-graphite-600 text-graphite-300 hover:text-white rounded-xl text-xs font-semibold transition-all">
             🔄 Reset Offset
           </button>
           <button onclick="syncFromTelegram()" id="btnTgSync" class="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg transition-all flex items-center gap-1.5">
@@ -349,7 +364,7 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
         <div>
-          <label class="block text-xs font-medium text-graphite-400 mb-1">Telegram Bot Token</label>
+          <label id="lblTgToken" class="block text-xs font-medium text-graphite-400 mb-1">Telegram Bot Token</label>
           <div class="relative">
             <input id="tgBotToken" type="password" placeholder="123456:ABC-DEF1234ghIkl..."
               class="w-full bg-graphite-950 border border-graphite-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-foxy-500 pr-9 font-mono" />
@@ -357,7 +372,7 @@
           </div>
         </div>
         <div>
-          <label class="block text-xs font-medium text-graphite-400 mb-1">Channel / Chat ID (опционально)</label>
+          <label id="lblTgChatId" class="block text-xs font-medium text-graphite-400 mb-1">Channel / Chat ID (опционально)</label>
           <input id="tgChatId" placeholder="@channelname или -1001234567890"
             class="w-full bg-graphite-950 border border-graphite-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-foxy-500 font-mono" />
         </div>
@@ -365,9 +380,9 @@
           <div class="flex items-center gap-3 py-1">
             <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-graphite-300">
               <input id="tgAutoSync" type="checkbox" onchange="saveTelegramSettings()" class="rounded border-graphite-700 text-foxy-500 focus:ring-0 bg-graphite-950" />
-              <span>Авто-синхронизация каждые 2 мин</span>
+              <span id="lblTgAutoSync">Авто-синхронизация каждые 2 мин</span>
             </label>
-            <button onclick="saveTelegramSettings()" class="ml-auto px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl text-xs font-bold transition-all">
+            <button id="btnTgSave" onclick="saveTelegramSettings()" class="ml-auto px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl text-xs font-bold transition-all">
               Save Config
             </button>
           </div>
@@ -405,15 +420,15 @@
         <div class="flex items-center gap-2">
           <span class="text-2xl">📄</span>
           <div>
-            <div class="font-bold text-white text-sm">Import CSV File</div>
-            <div class="text-xs text-graphite-400">Transactions_[Date].csv from terminal</div>
+            <div id="lblCsvImportTitle" class="font-bold text-white text-sm">Import CSV File</div>
+            <div id="lblCsvImportSub" class="text-xs text-graphite-400">Transactions_[Date].csv from terminal</div>
           </div>
         </div>
         <div id="csvDropZone" ondrop="handleDrop(event,'csv')" ondragover="event.preventDefault()" ondragleave="dragLeave(event)"
           class="border-2 border-dashed border-graphite-700 rounded-xl p-8 text-center hover:border-foxy-600 transition-all cursor-pointer"
           onclick="document.getElementById('csvFileInput').click()">
           <div class="text-3xl mb-2">📂</div>
-          <div class="text-sm text-graphite-400">Drop CSV file here or click to browse</div>
+          <div id="lblCsvDropText" class="text-sm text-graphite-400">Drop CSV file here or click to browse</div>
           <div class="text-xs text-graphite-600 mt-1">Transactions_*.csv</div>
         </div>
         <input id="csvFileInput" type="file" accept=".csv" class="hidden" onchange="handleFileSelect(event,'csv')" />
@@ -421,7 +436,7 @@
           <div class="text-xs font-semibold text-graphite-400">PREVIEW — First 5 rows:</div>
           <div id="csvPreviewContent" class="bg-graphite-950 rounded-xl p-3 font-mono text-xs text-graphite-300 overflow-x-auto"></div>
           <div id="csvImportStats" class="text-xs text-graphite-400"></div>
-          <button onclick="confirmCsvImport()" class="w-full py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm transition-all">⬇ Import to Database</button>
+          <button id="btnConfirmCsvImport" onclick="confirmCsvImport()" class="w-full py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm transition-all">⬇ Import to Database</button>
         </div>
       </div>
       <!-- Archive Config -->
@@ -466,7 +481,7 @@
   <!-- ─────────────── TAB: REPORTS ─────────────── -->
   <section id="pane-reports" class="tab-pane hidden space-y-4 animate-fade-in">
     <div class="flex items-center justify-between flex-wrap gap-3">
-      <h2 class="text-xl font-bold text-white">Financial Reports</h2>
+      <h2 id="lblReportsTitle" class="text-xl font-bold text-white">Financial Reports</h2>
       <div class="flex gap-2">
         <button onclick="generateFullReport()" class="px-4 py-2 bg-foxy-600 hover:bg-foxy-500 text-white rounded-xl font-bold text-sm transition-all">📊 Generate Report</button>
         <button onclick="printReport()" class="px-4 py-2 border border-graphite-700 hover:border-foxy-600 text-graphite-400 hover:text-foxy-400 rounded-xl font-semibold text-sm transition-all no-print">🖨 Print</button>
@@ -569,6 +584,255 @@ async function setSetting(key, value) {
   return putRecord('settings', { key, value });
 }
 
+// ════════════════════════════════════════════════ I18N SYSTEM (5 LANGUAGES) ════════════
+let _currentLang = localStorage.getItem('foxy_dashboard_lang') || 'en';
+
+const I18N = {
+  en: {
+    flag: '🇬🇧', code: 'EN', name: 'English',
+    merchantAnalytics: 'Merchant Analytics',
+    dbInit: 'DB Init…', dbReady: 'DB Ready', dbError: 'DB Error',
+    transactions: 'transactions', cards: 'cards',
+    syncTelegram: 'Sync Telegram',
+    tabOverview: '📊 Overview', tabCards: '💳 Card Registry', tabTrends: '📈 Trends', tabImport: '📥 Import', tabReports: '📋 Reports',
+    kpiLiability: 'Merchant Liability', kpiLiabilitySub: 'Active card balances',
+    kpiBreakage: 'Breakage Revenue', kpiBreakageSub: 'Expired unspent balances',
+    kpiAtRisk: 'At-Risk (30d)', kpiAtRiskSub: 'Expiring within 30 days',
+    kpiProlongCount: 'Prolongations', kpiProlongSub: 'Total value prolonged',
+    kpiInventory: 'Card Inventory',
+    chartOverviewTitle: 'Activations vs Redemptions (Last 30 days)',
+    chartDonutTitle: 'Card Status Distribution',
+    recentTxTitle: 'Recent Transactions', viewAll: 'View all →',
+    thTimestamp: 'Timestamp', thCardNo: 'Card №', thType: 'Type', thAmount: 'Amount', thBalanceAfter: 'Balance After', thTerminal: 'Terminal',
+    filterAllActive: 'All Active', filterExp7: 'Expiring 7d', filterExp30: 'Expiring 30d', filterExpired: 'Expired (Breakage)', filterProlonged: 'Prolonged', filterDepleted: 'Depleted', filterAllCards: 'All Cards',
+    apply: 'Apply', searchPlaceholder: 'Card № (decimal)…', cardRegistryTitle: 'Card Registry',
+    thNominal: 'Nominal', thBalance: 'Balance', thExpiry: 'Expiry Date', thStatus: 'Status', thActions: 'Actions',
+    tgTitle: 'Telegram Bot Cloud Sync', tgSubtitle: 'Automatic download of shift CSV reports from Telegram into local database',
+    tgBotTokenLabel: 'Telegram Bot Token', tgChatIdLabel: 'Channel / Chat ID (optional)', tgAutoSyncLabel: 'Auto-sync every 2 min',
+    saveConfig: 'Save Config', testBot: '🔍 Test Bot', resetOffset: '🔄 Reset Offset', syncNow: '⚡ Sync Now from Telegram',
+    importCsvTitle: 'Import CSV File', importCsvSubtitle: 'Transactions_[Date].csv from terminal',
+    dropCsv: 'Drop CSV file here or click to browse', importToDb: '⬇ Import to Database',
+    reportsTitle: 'Financial & Audit Reports', btnZReport: 'Z-Report (Shift Close)', btnMonthly: 'Monthly Reconciliation', btnBreakage: 'Breakage Realization',
+    noTxYet: 'No transactions yet. Import terminal data.', historyTitle: 'Import History', noImportsYet: 'No imports yet.',
+    statusDepleted: 'DEPLETED', statusExpired: 'EXPIRED', statusProlonged: 'PROLONGED', statusActive: 'ACTIVE',
+  },
+  ru: {
+    flag: '🇷🇺', code: 'RU', name: 'Русский',
+    merchantAnalytics: 'Аналитика мерчанта',
+    dbInit: 'Иниц. БД…', dbReady: 'БД готова', dbError: 'Ошибка БД',
+    transactions: 'транзакций', cards: 'карт',
+    syncTelegram: 'Синхронизация',
+    tabOverview: '📊 Обзор', tabCards: '💳 Реестр карт', tabTrends: '📈 Тренды', tabImport: '📥 Импорт', tabReports: '📋 Отчеты',
+    kpiLiability: 'Обязательства мерчанта', kpiLiabilitySub: 'Остаток на активных картах',
+    kpiBreakage: 'Доход от сгорания', kpiBreakageSub: 'Истекшие неиспользованные суммы',
+    kpiAtRisk: 'Под риском (30 дн)', kpiAtRiskSub: 'Истекают в течение 30 дней',
+    kpiProlongCount: 'Продления', kpiProlongSub: 'Сумма продленных карт',
+    kpiInventory: 'Инвентарь карт',
+    chartOverviewTitle: 'Активации vs Списания (за 30 дней)',
+    chartDonutTitle: 'Распределение статусов карт',
+    recentTxTitle: 'Последние транзакции', viewAll: 'Все карты →',
+    thTimestamp: 'Время', thCardNo: '№ карты', thType: 'Тип', thAmount: 'Сумма', thBalanceAfter: 'Баланс после', thTerminal: 'Терминал',
+    filterAllActive: 'Все активные', filterExp7: 'Истекают 7 дн', filterExp30: 'Истекают 30 дн', filterExpired: 'Сгоревшие (Breakage)', filterProlonged: 'Продленные', filterDepleted: 'Израсходованные', filterAllCards: 'Все карты',
+    apply: 'Применить', searchPlaceholder: '№ карты (десятичный)…', cardRegistryTitle: 'Реестр карт',
+    thNominal: 'Номинал', thBalance: 'Баланс', thExpiry: 'Срок действия', thStatus: 'Статус', thActions: 'Действия',
+    tgTitle: 'Telegram Bot Cloud Sync', tgSubtitle: 'Автоматическая загрузка CSV-отчетов смены из Telegram в локальную базу данных',
+    tgBotTokenLabel: 'Telegram Bot Token', tgChatIdLabel: 'Канал / Chat ID (опционально)', tgAutoSyncLabel: 'Авто-синхронизация каждые 2 мин',
+    saveConfig: 'Сохранить', testBot: '🔍 Проверить бота', resetOffset: '🔄 Сбросить указатель', syncNow: '⚡ Синхронизировать сейчас',
+    importCsvTitle: 'Импорт CSV файла', importCsvSubtitle: 'Файлы Transactions_*.csv с терминала',
+    dropCsv: 'Перетащите CSV файл сюда или кликните', importToDb: '⬇ Импортировать в базу данных',
+    reportsTitle: 'Финансовые и аудиторские отчеты', btnZReport: 'Z-Отчет (Закрытие смены)', btnMonthly: 'Ежемесячная сверка', btnBreakage: 'Списание сгоревших средств',
+    noTxYet: 'Нет транзакций. Импортируйте данные с терминала.', historyTitle: 'История импорта', noImportsYet: 'Импортов пока нет.',
+    statusDepleted: 'ИЗРАСХОДОВАНА', statusExpired: 'ИСТЕКЛА', statusProlonged: 'ПРОДЛЕНА', statusActive: 'АКТИВНА',
+  },
+  lv: {
+    flag: '🇱🇻', code: 'LV', name: 'Latviešu',
+    merchantAnalytics: 'Tirgotāja analītika',
+    dbInit: 'DB inits…', dbReady: 'DB gatava', dbError: 'DB kļūda',
+    transactions: 'transakcijas', cards: 'kartes',
+    syncTelegram: 'Sinhronizēt',
+    tabOverview: '📊 Pārskats', tabCards: '💳 Karšu reģistrs', tabTrends: '📈 Tendences', tabImport: '📥 Imports', tabReports: '📋 Pārskati',
+    kpiLiability: 'Tirgotāja saistības', kpiLiabilitySub: 'Aktīvo karšu atlikums',
+    kpiBreakage: 'Ieņēmumi no beigušām', kpiBreakageSub: 'Beigušies neiztērētie atlikumi',
+    kpiAtRisk: 'Riska zonā (30d)', kpiAtRiskSub: 'Beidzas 30 dienu laikā',
+    kpiProlongCount: 'Pagarināšana', kpiProlongSub: 'Pagarinātā kopējā vērtība',
+    kpiInventory: 'Karšu inventārs',
+    chartOverviewTitle: 'Aktivizācijas vs Dzēšana (Pēdējās 30 dienās)',
+    chartDonutTitle: 'Karšu statusu sadalījums',
+    recentTxTitle: 'Pēdējās transakcijas', viewAll: 'Skatīt visas →',
+    thTimestamp: 'Laiks', thCardNo: 'Kartes №', thType: 'Veids', thAmount: 'Summa', thBalanceAfter: 'Atlikums pēc', thTerminal: 'Terminālis',
+    filterAllActive: 'Visas aktīvās', filterExp7: 'Beidzas 7d', filterExp30: 'Beidzas 30d', filterExpired: 'Beigušās (peļņa)', filterProlonged: 'Pagarinātās', filterDepleted: 'Iztērētās', filterAllCards: 'Visas kartes',
+    apply: 'Pielietot', searchPlaceholder: 'Kartes № (decimāls)…', cardRegistryTitle: 'Karšu reģistrs',
+    thNominal: 'Nomināls', thBalance: 'Atlikums', thExpiry: 'Derīguma termiņš', thStatus: 'Statuss', thActions: 'Darbības',
+    tgTitle: 'Telegram Bot Cloud Sync', tgSubtitle: 'Automātiska maiņas CSV atskaišu ielāde no Telegram kanāla lokālajā datubāzē',
+    tgBotTokenLabel: 'Telegram Bot Token', tgChatIdLabel: 'Kanāls / Chat ID (neobligāti)', tgAutoSyncLabel: 'Automātiskā sinhronizācija ik pēc 2 min',
+    saveConfig: 'Saglabāt', testBot: '🔍 Testēt botu', resetOffset: '🔄 Atiestatīt rādītāju', syncNow: '⚡ Sinhronizēt tagad',
+    importCsvTitle: 'Importēt CSV failu', importCsvSubtitle: 'Transactions_*.csv faili no termināļa',
+    dropCsv: 'Ievelciet CSV failu šeit vai noklikšķiniet', importToDb: '⬇ Importēt datubāzē',
+    reportsTitle: 'Finanšu un audita pārskati', btnZReport: 'Z-Pārskats (Maiņas slēgšana)', btnMonthly: 'Mēneša saskaņošana', btnBreakage: 'Beigušos līdzekļu norakstīšana',
+    noTxYet: 'Nav transakciju. Importējiet datus no termināļa.', historyTitle: 'Importa vēsture', noImportsYet: 'Vēl nav importu.',
+    statusDepleted: 'IZLIETOTA', statusExpired: 'BEIGUSIES', statusProlonged: 'PAGARINĀTA', statusActive: 'AKTĪVA',
+  },
+  et: {
+    flag: '🇪🇪', code: 'ET', name: 'Eesti',
+    merchantAnalytics: 'Kaupmehe analüütika',
+    dbInit: 'AB algus…', dbReady: 'AB valmis', dbError: 'AB viga',
+    transactions: 'tehingut', cards: 'kaarti',
+    syncTelegram: 'Sünkrooni',
+    tabOverview: '📊 Ülevaade', tabCards: '💳 Kaartide register', tabTrends: '📈 Trendid', tabImport: '📥 Import', tabReports: '📋 Aruanded',
+    kpiLiability: 'Kaupmehe kohustused', kpiLiabilitySub: 'Aktiivsete kaartide saldod',
+    kpiBreakage: 'Aegunud kaartide tulu', kpiBreakageSub: 'Aegunud kasutamata jäägid',
+    kpiAtRisk: 'Riskis (30p)', kpiAtRiskSub: 'Aegub 30 päeva jooksul',
+    kpiProlongCount: 'Pikendamised', kpiProlongSub: 'Pikendatud koguväärtus',
+    kpiInventory: 'Kaartide inventar',
+    chartOverviewTitle: 'Aktiveerimised vs Lunastamised (Viimased 30 päeva)',
+    chartDonutTitle: 'Kaartide olekute jaotus',
+    recentTxTitle: 'Viimased tehingud', viewAll: 'Vaata kõiki →',
+    thTimestamp: 'Aeg', thCardNo: 'Kaardi nr', thType: 'Tüüp', thAmount: 'Summa', thBalanceAfter: 'Saldo pärast', thTerminal: 'Terminal',
+    filterAllActive: 'Kõik aktiivsed', filterExp7: 'Aegub 7p', filterExp30: 'Aegub 30p', filterExpired: 'Aegunud (tulu)', filterProlonged: 'Pikendatud', filterDepleted: 'Kasutatud', filterAllCards: 'Kõik kaardid',
+    apply: 'Rakenda', searchPlaceholder: 'Kaardi nr (detsimaal)…', cardRegistryTitle: 'Kaartide register',
+    thNominal: 'Nominaal', thBalance: 'Saldo', thExpiry: 'Aegumiskuupäev', thStatus: 'Olek', thActions: 'Tegevused',
+    tgTitle: 'Telegram Bot Cloud Sync', tgSubtitle: 'Vahetuse CSV aruannete automaatne allalaadimine Telegramist kohalikku andmebaasi',
+    tgBotTokenLabel: 'Telegram Bot Token', tgChatIdLabel: 'Kanal / Chat ID (valikuline)', tgAutoSyncLabel: 'Automaatne sünkroonimine iga 2 min järel',
+    saveConfig: 'Salvesta', testBot: '🔍 Testi bot', resetOffset: '🔄 Lähtesta nihe', syncNow: '⚡ Sünkrooni kohe',
+    importCsvTitle: 'Impordi CSV fail', importCsvSubtitle: 'Terminali Transactions_*.csv failid',
+    dropCsv: 'Lohista CSV fail siia või klõpsa', importToDb: '⬇ Impordi andmebaasi',
+    reportsTitle: 'Finants- ja auditiaruanded', btnZReport: 'Z-Aruanne (Vahetuse sulgemine)', btnMonthly: 'Kuupõhine vastavusse viimine', btnBreakage: 'Aegunud vahendite realiseerimine',
+    noTxYet: 'Tehingud puuduvad. Impordi terminali andmed.', historyTitle: 'Impordi ajalugu', noImportsYet: 'Importe pole veel.',
+    statusDepleted: 'KASUTATUD', statusExpired: 'AEGUNUD', statusProlonged: 'PIKENDATUD', statusActive: 'AKTIIVNE',
+  },
+  lt: {
+    flag: '🇱🇹', code: 'LT', name: 'Lietuvių',
+    merchantAnalytics: 'Prekybininko analitika',
+    dbInit: 'DB inits…', dbReady: 'DB paruošta', dbError: 'DB klaida',
+    transactions: 'operacijų', cards: 'kortelių',
+    syncTelegram: 'Sinchronizuoti',
+    tabOverview: '📊 Apžvalga', tabCards: '💳 Kortelių registras', tabTrends: '📈 Tendencijos', tabImport: '📥 Importas', tabReports: '📋 Ataskaitos',
+    kpiLiability: 'Prekybininko įsipareigojimai', kpiLiabilitySub: 'Aktyvių kortelių likučiai',
+    kpiBreakage: 'Pajamos iš nepasinaudotų', kpiBreakageSub: 'Pasibaigę nepanaudoti likučiai',
+    kpiAtRisk: 'Rizikoje (30d)', kpiAtRiskSub: 'Baigiasi per 30 dienų',
+    kpiProlongCount: 'Pratęsimai', kpiProlongSub: 'Bendra pratęsta vertė',
+    kpiInventory: 'Kortelių apskaita',
+    chartOverviewTitle: 'Aktyvavimai vs Panaudojimai (Paskutinės 30 dienų)',
+    chartDonutTitle: 'Kortelių būsenų pasiskirstymas',
+    recentTxTitle: 'Paskutinės operacijos', viewAll: 'Žiūrėti visas →',
+    thTimestamp: 'Laikas', thCardNo: 'Kortelės nr.', thType: 'Tipas', thAmount: 'Suma', thBalanceAfter: 'Likutis po', thTerminal: 'Terminalas',
+    filterAllActive: 'Visos aktyvios', filterExp7: 'Baigiasi 7d', filterExp30: 'Baigiasi 30d', filterExpired: 'Pasibaigusios (pajamos)', filterProlonged: 'Pratęstos', filterDepleted: 'Išnaudotos', filterAllCards: 'Visos kortelės',
+    apply: 'Taikyti', searchPlaceholder: 'Kortelės nr. (dešimtainis)…', cardRegistryTitle: 'Kortelių registras',
+    thNominal: 'Nominalas', thBalance: 'Likutis', thExpiry: 'Galiojimo pabaiga', thStatus: 'Būsena', thActions: 'Veiksmai',
+    tgTitle: 'Telegram Bot Cloud Sync', tgSubtitle: 'Automatinis pamainos CSV ataskaitų atsisiuntimas iš Telegram į vietinę duomenų bazę',
+    tgBotTokenLabel: 'Telegram Bot Token', tgChatIdLabel: 'Kanalas / Chat ID (neprivaloma)', tgAutoSyncLabel: 'Automatinis sinchronizavimas kas 2 min',
+    saveConfig: 'Išsaugoti', testBot: '🔍 Tikrinti botą', resetOffset: '🔄 Atstatyti rodyklę', syncNow: '⚡ Sinchronizuoti dabar',
+    importCsvTitle: 'Importuoti CSV failą', importCsvSubtitle: 'Terminalo Transactions_*.csv failai',
+    dropCsv: 'Nutempkite CSV failą čia arba spustelėkite', importToDb: '⬇ Importuoti į duomenų bazę',
+    reportsTitle: 'Finansinės ir audito ataskaitos', btnZReport: 'Z-Ataskaita (Pamainos uždarymas)', btnMonthly: 'Mėnesinis suderinimas', btnBreakage: 'Pasibaigusių lėšų nurašymas',
+    noTxYet: 'Operacijų dar nėra. Importuokite terminalo duomenis.', historyTitle: 'Importo istorija', noImportsYet: 'Importų dar nėra.',
+    statusDepleted: 'IŠNAUDOTA', statusExpired: 'PASIBAIGUSI', statusProlonged: 'PRATĘSTA', statusActive: 'AKTYVI',
+  }
+};
+
+function t(key) {
+  const dict = I18N[_currentLang] || I18N.en;
+  return dict[key] || I18N.en[key] || key;
+}
+
+function toggleLangMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('langDropdown');
+  if (menu) menu.classList.toggle('hidden');
+}
+
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('langDropdown');
+  if (menu && !menu.classList.contains('hidden') && !e.target.closest('#langMenuBtn')) {
+    menu.classList.add('hidden');
+  }
+});
+
+function setDashboardLanguage(langCode) {
+  if (!I18N[langCode]) return;
+  _currentLang = langCode;
+  localStorage.setItem('foxy_dashboard_lang', langCode);
+  document.getElementById('langDropdown')?.classList.add('hidden');
+  applyDashboardTranslations();
+}
+
+function applyDashboardTranslations() {
+  const d = I18N[_currentLang] || I18N.en;
+  const el = (id) => document.getElementById(id);
+  
+  // Header
+  if (el('currentLangFlag')) el('currentLangFlag').textContent = d.flag;
+  if (el('currentLangCode')) el('currentLangCode').textContent = d.code;
+  if (el('headerSyncText')) el('headerSyncText').textContent = d.syncTelegram;
+
+  // Tabs
+  if (el('tab-overview')) el('tab-overview').textContent = d.tabOverview;
+  if (el('tab-cards')) el('tab-cards').textContent = d.tabCards;
+  if (el('tab-trends')) el('tab-trends').textContent = d.tabTrends;
+  if (el('tab-import')) el('tab-import').textContent = d.tabImport;
+  if (el('tab-reports')) el('tab-reports').textContent = d.tabReports;
+
+  // Overview KPIs & Titles
+  if (el('lblKpiLiability')) el('lblKpiLiability').textContent = d.kpiLiability;
+  if (el('lblKpiLiabilitySub')) el('lblKpiLiabilitySub').textContent = d.kpiLiabilitySub;
+  if (el('lblKpiBreakage')) el('lblKpiBreakage').textContent = d.kpiBreakage;
+  if (el('lblKpiBreakageSub')) el('lblKpiBreakageSub').textContent = d.kpiBreakageSub;
+  if (el('lblKpiAtRisk')) el('lblKpiAtRisk').textContent = d.kpiAtRisk;
+  if (el('lblKpiAtRiskSub')) el('lblKpiAtRiskSub').textContent = d.kpiAtRiskSub;
+  if (el('lblKpiProlong')) el('lblKpiProlong').textContent = d.kpiProlongCount;
+  if (el('lblKpiProlongSub')) el('lblKpiProlongSub').textContent = d.kpiProlongSub;
+  if (el('lblKpiInventoryTitle')) el('lblKpiInventoryTitle').textContent = d.kpiInventory;
+  if (el('lblOverviewChartTitle')) el('lblOverviewChartTitle').textContent = d.chartOverviewTitle;
+  if (el('lblDonutChartTitle')) el('lblDonutChartTitle').textContent = d.chartDonutTitle;
+  if (el('lblRecentTxTitle')) el('lblRecentTxTitle').textContent = d.recentTxTitle;
+  if (el('lblViewAllRecent')) el('lblViewAllRecent').textContent = d.viewAll;
+
+  // Filter buttons in Card Registry
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  if (filterBtns.length >= 7) {
+    filterBtns[0].textContent = d.filterAllActive;
+    filterBtns[1].textContent = d.filterExp7;
+    filterBtns[2].textContent = d.filterExp30;
+    filterBtns[3].textContent = d.filterExpired;
+    filterBtns[4].textContent = d.filterProlonged;
+    filterBtns[5].textContent = d.filterDepleted;
+    filterBtns[6].textContent = d.filterAllCards;
+  }
+
+  if (el('cardSearch')) el('cardSearch').placeholder = d.searchPlaceholder;
+  if (el('lblCardRegistryTitle')) el('lblCardRegistryTitle').textContent = d.cardRegistryTitle;
+
+  // Telegram Sync section
+  if (el('lblTgSyncTitle')) el('lblTgSyncTitle').textContent = d.tgTitle;
+  if (el('lblTgSyncSub')) el('lblTgSyncSub').textContent = d.tgSubtitle;
+  if (el('lblTgToken')) el('lblTgToken').textContent = d.tgBotTokenLabel;
+  if (el('lblTgChatId')) el('lblTgChatId').textContent = d.tgChatIdLabel;
+  if (el('lblTgAutoSync')) el('lblTgAutoSync').textContent = d.tgAutoSyncLabel;
+  if (el('btnTgSave')) el('btnTgSave').textContent = d.saveConfig;
+  if (el('btnTgTest')) el('btnTgTest').textContent = d.testBot;
+  if (el('btnTgReset')) el('btnTgReset').textContent = d.resetOffset;
+  if (el('btnTgSync')) el('btnTgSync').innerHTML = `⚡ ${d.syncNow}`;
+
+  // CSV Import
+  if (el('lblCsvImportTitle')) el('lblCsvImportTitle').textContent = d.importCsvTitle;
+  if (el('lblCsvImportSub')) el('lblCsvImportSub').textContent = d.importCsvSubtitle;
+  if (el('lblCsvDropText')) el('lblCsvDropText').textContent = d.dropCsv;
+  if (el('btnConfirmCsvImport')) el('btnConfirmCsvImport').textContent = d.importToDb;
+
+  // Reports
+  if (el('lblReportsTitle')) el('lblReportsTitle').textContent = d.reportsTitle;
+
+  // Re-render active view
+  const activeBtn = document.querySelector('.tab-btn.tab-active');
+  if (activeBtn) {
+    const tabName = activeBtn.id.replace('tab-', '');
+    if (tabName === 'overview') renderOverview();
+    else if (tabName === 'cards') renderCardRegistry();
+    else if (tabName === 'trends') renderTrends();
+    else if (tabName === 'import') renderImportLog();
+  }
+}
+
 // ════════════════════════════════════════════════ UI UTILITIES ════════════
 function showToast(message, type = 'info', duration = 4000) {
   const colors = { success:'bg-emerald-900/90 border-emerald-700 text-emerald-100', error:'bg-red-900/90 border-red-700 text-red-100', warn:'bg-foxy-900/90 border-foxy-700 text-foxy-100', info:'bg-blue-900/90 border-blue-700 text-blue-100' };
@@ -644,12 +908,12 @@ function opTypeBadge(type) {
 }
 
 function cardStatusBadge(status, daysLeft) {
-  if (status === 'DEPLETED') return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold" style="background:rgba(107,114,128,0.2);color:#6b7280;border:1px solid rgba(107,114,128,0.3)">DEPLETED</span>';
-  if (status === 'EXPIRED' || daysLeft < 0)  return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-error">EXPIRED</span>';
-  if (status === 'PROLONGED') return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-purple">PROLONGED</span>';
+  if (status === 'DEPLETED') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold" style="background:rgba(107,114,128,0.2);color:#6b7280;border:1px solid rgba(107,114,128,0.3)">${t('statusDepleted')}</span>`;
+  if (status === 'EXPIRED' || daysLeft < 0)  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-error">${t('statusExpired')}</span>`;
+  if (status === 'PROLONGED') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-purple">${t('statusProlonged')}</span>`;
   if (daysLeft <= 7)  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-error">Exp. in ${daysLeft}d</span>`;
   if (daysLeft <= 30) return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-warn">Exp. in ${daysLeft}d</span>`;
-  return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-success">ACTIVE</span>';
+  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold badge-success">${t('statusActive')}</span>`;
 }
 
 // ════════════════════════════════════════════════ CHARTS ════════════════
@@ -1752,9 +2016,10 @@ async function refreshDbStats() {
 // ════════════════════════════════════════════════ INIT ════════════════
 async function init() {
   try {
+    applyDashboardTranslations();
     db = await openDatabase();
     document.getElementById('dbStatusBadge').className = 'px-3 py-1 rounded-full text-xs font-semibold badge-success';
-    document.getElementById('dbStatusBadge').textContent = 'DB Ready';
+    document.getElementById('dbStatusBadge').textContent = t('dbReady');
     checkFsSupport();
     await loadTelegramSettings();
     await renderOverview();
@@ -1773,7 +2038,7 @@ async function init() {
     }
   } catch(err) {
     document.getElementById('dbStatusBadge').className = 'px-3 py-1 rounded-full text-xs font-semibold badge-error';
-    document.getElementById('dbStatusBadge').textContent = 'DB Error';
+    document.getElementById('dbStatusBadge').textContent = t('dbError');
     showToast('Database initialization failed: ' + err.message, 'error');
   }
 }

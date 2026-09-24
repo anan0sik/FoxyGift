@@ -677,6 +677,6 @@ class CardRepository @Inject constructor(
 
     // ─────────────────────── Private ─────────────────────────────────────────
 
-    /** Simple shift ID: current date "YYYY-MM-DD" as shift key. */
-    private fun shiftId() = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    /** Shift ID from provision repository, supporting multiple shifts per day. */
+    private fun shiftId(): String = provisionRepo.getCurrentShiftId()
 }

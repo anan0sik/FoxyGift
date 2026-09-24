@@ -54,4 +54,10 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET status = :status WHERE id = :id")
     suspend fun updateTransactionStatus(id: Long, status: String)
+
+    @Query("DELETE FROM transactions WHERE shift_id = :shiftId")
+    suspend fun deleteTransactionsForShift(shiftId: String)
+
+    @Query("DELETE FROM transactions")
+    suspend fun clearAllTransactions()
 }
