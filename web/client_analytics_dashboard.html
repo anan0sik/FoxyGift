@@ -374,6 +374,18 @@
         </div>
       </div>
 
+      <!-- Telegram Import Instruction & Status Hint -->
+      <div class="bg-blue-950/30 border border-blue-800/40 rounded-xl p-3 text-xs text-blue-200 space-y-1.5">
+        <div class="font-semibold text-blue-300 flex items-center gap-1.5">
+          ℹ️ Как Telegram Bot доставляет отчеты в дашборд:
+        </div>
+        <div class="text-graphite-300 space-y-1">
+          <div><strong class="text-white">Способ 1 (В Telegram):</strong> В вашем Telegram-канале нажмите на присланный файл <code class="text-blue-300 font-mono">Transactions_*.csv</code> ➔ <strong>«Переслать» (Forward)</strong> ➔ отправьте в личный чат вашему боту. После этого нажмите <strong>«⚡ Sync Now from Telegram»</strong>.</div>
+          <div><strong class="text-white">Способ 2 (Drag & Drop):</strong> Перетащите CSV-файл прямо мышкой из Telegram в блок <strong>«Manual File Upload»</strong> ниже.</div>
+          <div class="text-graphite-400 text-[11px] pt-1">💡 <em>Особенность Telegram Bot API:</em> Telegram не присылает боту его собственные исходящие сообщения в канале — поэтому достаточно переслать файл боту от своего имени или перетащить его мышкой.</div>
+        </div>
+      </div>
+
       <div class="flex items-center justify-between flex-wrap gap-2 text-xs text-graphite-500 border-t border-graphite-800/60 pt-2">
         <div id="tgBotStatus">Бот не настроен. Укажите токен бота от @BotFather и нажмите "Save Config".</div>
         <div id="tgSyncStats" class="font-mono">Последняя синхронизация: —</div>
@@ -1413,6 +1425,24 @@ function updateTelegramStatusBadge(token, lastSyncTime) {
   }
 }
 
+function matchesChatTarget(msgChat, target) {
+  if (!target) return true;
+  const cleanTarget = target.trim().replace(/^https?:\/\/t\.me\//, '').replace(/^t\.me\//, '').replace(/^@/, '').toLowerCase();
+  if (!cleanTarget) return true;
+
+  const msgId = String(msgChat?.id || '').trim();
+  const msgUsername = (msgChat?.username || '').trim().replace(/^@/, '').toLowerCase();
+
+  if (msgUsername && msgUsername === cleanTarget) return true;
+  if (msgId === cleanTarget) return true;
+
+  const strippedTarget = cleanTarget.replace(/^-100/, '').replace(/^-/, '');
+  const strippedMsgId  = msgId.replace(/^-100/, '').replace(/^-/, '');
+  if (strippedTarget && strippedMsgId && strippedTarget === strippedMsgId) return true;
+
+  return false;
+}
+
 async function syncFromTelegram(isAuto = false) {
   if (_isTgSyncing) return;
 
@@ -1446,7 +1476,7 @@ async function syncFromTelegram(isAuto = false) {
 
   try {
     let offset = parseInt((await getSetting('tg_last_update_id')) || localStorage.getItem('foxy_tg_last_update_id') || '0', 10);
-    const updatesUrl = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&limit=100&allowed_updates=${encodeURIComponent(JSON.stringify(["message","channel_post"]))}`;
+    const updatesUrl = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&limit=100&allowed_updates=${encodeURIComponent(JSON.stringify(["message","channel_post","edited_message","edited_channel_post"]))}`;
     const resp = await fetch(updatesUrl);
     if (!resp.ok) {
       const errText = await resp.text();
@@ -1468,23 +1498,24 @@ async function syncFromTelegram(isAuto = false) {
         highestUpdateId = update.update_id + 1;
       }
 
-      const msg = update.channel_post || update.message;
+      const msg = update.channel_post || update.message || update.edited_channel_post || update.edited_message;
       if (!msg) continue;
 
-      if (targetChatId) {
-        const cleanTarget = targetChatId.replace('@', '').toLowerCase();
-        const msgChatId = String(msg.chat?.id || '');
-        const msgUsername = (msg.chat?.username || '').toLowerCase();
-        if (msgChatId !== targetChatId && msgUsername !== cleanTarget) {
-          continue;
-        }
+      if (targetChatId && !matchesChatTarget(msg.chat, targetChatId)) {
+        continue;
       }
 
       const doc = msg.document;
       if (!doc) continue;
 
       const fileName = doc.file_name || '';
-      if (!fileName.toLowerCase().endsWith('.csv') && !fileName.toLowerCase().includes('transaction')) {
+      const mimeType = (doc.mime_type || '').toLowerCase();
+      const isCsv = fileName.toLowerCase().endsWith('.csv') || 
+                    fileName.toLowerCase().includes('transaction') ||
+                    mimeType.includes('csv') ||
+                    mimeType.includes('excel') ||
+                    mimeType === 'text/plain';
+      if (!isCsv) {
         continue;
       }
 
@@ -1541,9 +1572,13 @@ async function syncFromTelegram(isAuto = false) {
     }
 
     if (filesProcessed > 0) {
-      showToast(`✈️ Telegram: Processed ${filesProcessed} report(s). ${totalNewRecords} new transactions imported (${totalSkipped} duplicates skipped).`, 'success');
+      showToast(`✈️ Telegram: Обработано ${filesProcessed} отчетов. Импортировано ${totalNewRecords} новых транзакций (${totalSkipped} дубликатов пропущено).`, 'success');
     } else if (!isAuto) {
-      showToast(`✈️ Telegram: Checked ${updates.length} updates. No new CSV reports found.`, 'info');
+      if (updates.length === 0) {
+        showToast(`✈️ Telegram: Новых файлов нет. Перешлите CSV-файл из канала боту в ЛС или перетащите его мышкой.`, 'info');
+      } else {
+        showToast(`✈️ Telegram: Проверено ${updates.length} сообщений, но CSV-отчетов с транзакциями среди них нет.`, 'info');
+      }
     }
   } catch(err) {
     console.error('Telegram sync error:', err);
